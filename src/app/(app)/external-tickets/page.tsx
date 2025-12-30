@@ -1,0 +1,631 @@
+
+"use client"
+
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { PlusCircle, Loader2, LayoutDashboard, List, RefreshCcw } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { NewExternalTicketForm, NewExternalTicketFormValues } from "@/components/external-tickets/new-external-ticket-form";
+import { ExternalTicket, Sector, User, Technician } from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
+import { ExternalTicketCard } from "@/components/external-tickets/external-ticket-card";
+import { ExternalTicketsFilterBar, StatusFilter } from "@/components/external-tickets/external-tickets-filter-bar";
+import { useToast } from "@/hooks/use-toast";
+import { addDoc, collection, getDocs, doc, updateDoc, deleteField, writeBatch, onSnapshot } from "firebase/firestore";
+import { db } from "@/firebase/config";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { isToday, parseISO, isPast } from "date-fns";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ExternalTicketsTable } from "@/components/external-tickets/external-tickets-table";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { sendWhatsappMessage } from "@/lib/services/notification-service";
+
+
+type ConfirmationState = {
+    isOpen: boolean;
+    action: 'reopen' | 'cancel' | 'take' | null;
+    ticket: ExternalTicket | null;
+};
+
+const STATUS_FILTER_STORAGE_KEY = 'external_tickets_status_filter';
+const VIEW_MODE_STORAGE_KEY = 'external_tickets_view_mode';
+
+type ViewMode = 'kanban' | 'list';
+
+export default function ExternalTicketsPage() {
+  const [isNewTicketDialogOpen, setIsNewTicketDialogOpen] = useState(false);
+  const [tickets, setTickets] = useState<ExternalTicket[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [sectors, setSectors] = useState<Sector[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
+  const [confirmation, setConfirmation] = useState<ConfirmationState>({ isOpen: false, action: null, ticket: null });
+  const isMobile = useIsMobile();
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+
+  const [pullStartY, setPullStartY] = useState(0);
+  const [pullDistance, setPullDistance] = useState(0);
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
+    if (typeof window !== 'undefined') {
+      return (sessionStorage.getItem(STATUS_FILTER_STORAGE_KEY) as StatusFilter) || 'pendente';
+    }
+    return 'pendente';
+  });
+  const [technicianFilter, setTechnicianFilter] = useState<string>('all');
+  const [sectorFilter, setSectorFilter] = useState<string>('all');
+  const [contractOnly, setContractOnly] = useState(false);
+  const [myTicketsOnly, setMyTicketsOnly] = useState(false);
+  
+  useEffect(() => {
+    const storedViewMode = sessionStorage.getItem(VIEW_MODE_STORAGE_KEY) as ViewMode | null;
+    if (isMobile) {
+      setViewMode('kanban');
+    } else {
+      setViewMode(storedViewMode || 'kanban');
+    }
+  }, [isMobile]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [usersSnapshot, sectorsSnapshot, techsSnapshot] = await Promise.all([
+        getDocs(collection(db, "users")),
+        getDocs(collection(db, "sectors")),
+        getDocs(collection(db, "technicians")),
+      ]);
+      
+      const usersData = usersSnapshot.docs.map(doc => {
+          const userData = { id: doc.id, ...doc.data() } as User;
+           if ((userData as any).sectorId && !userData.sectorIds) {
+              userData.sectorIds = [(userData as any).sectorId];
+          } else if (!userData.sectorIds) {
+              userData.sectorIds = [];
+          }
+          return userData;
+      });
+      const sectorsData = sectorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector));
+      const techsData = techsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
+      
+      setUsers(usersData);
+      setSectors(sectorsData);
+      setTechnicians(techsData);
+
+      const unsubscribeTickets = onSnapshot(collection(db, "external-tickets"), (snapshot) => {
+        const ticketsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket));
+        setTickets(ticketsData);
+        setLoading(false);
+        setPullDistance(0);
+      });
+
+      return () => unsubscribeTickets();
+
+    } catch (error) {
+      console.error("Error fetching tickets page data:", error);
+      toast({ variant: 'destructive', title: "Erro ao buscar dados" });
+      setLoading(false);
+    }
+  }, [toast]);
+
+
+  useEffect(() => {
+    const unsubscribePromise = fetchData();
+    return () => {
+        unsubscribePromise.then(unsub => {
+            if (unsub) unsub();
+        });
+    }
+  }, [fetchData]);
+  
+  // Persist status filter to session storage
+  useEffect(() => {
+    sessionStorage.setItem(STATUS_FILTER_STORAGE_KEY, statusFilter);
+  }, [statusFilter]);
+  
+  // Persist view mode
+  useEffect(() => {
+    if (!isMobile) {
+        sessionStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+    }
+  }, [viewMode, isMobile]);
+  
+  // Set "myTicketsOnly" to true by default for certain statuses, unless a tech is filtered.
+  useEffect(() => {
+    if ((statusFilter === 'em andamento' || statusFilter === 'concluído') && technicianFilter === 'all') {
+      setMyTicketsOnly(true);
+    } else {
+      setMyTicketsOnly(false);
+    }
+    
+    // Reset technician filter when switching to 'pendente'
+    if (statusFilter === 'pendente') {
+      setTechnicianFilter('all');
+    }
+  }, [statusFilter, technicianFilter]);
+
+  // Uncheck "myTicketsOnly" if a technician is selected from the filter
+  useEffect(() => {
+    if (technicianFilter !== 'all') {
+      setMyTicketsOnly(false);
+    }
+  }, [technicianFilter]);
+  
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      setPullStartY(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (window.scrollY === 0 && pullStartY > 0) {
+      const currentY = e.touches[0].clientY;
+      const distance = currentY - pullStartY;
+      if (distance > 0) {
+        e.preventDefault(); // Prevent browser's default pull-to-refresh
+        setPullDistance(Math.min(distance, 150));
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullDistance > 100) {
+        // With real-time, manual refresh is less critical, but we can keep it as a backup.
+        // The listener will handle the updates, so we just reset the visual.
+        setPullDistance(0);
+    } else {
+      setPullDistance(0);
+    }
+    setPullStartY(0);
+  };
+
+
+  const handleAddTicket = async (values: NewExternalTicketFormValues & { type: 'padrão' | 'contrato' | 'urgente' | 'agendado' | 'retorno', slaExpiresAt?: string }) => {
+    if (!user) return;
+  
+    const newTicketData: Omit<ExternalTicket, 'id'> = {
+      client: {
+        id: '', // Will be filled if clientId exists
+        name: values.clientName,
+        phone: values.contact || '',
+        isWhats: values.isWhatsapp,
+      },
+      sectorId: values.sectorId,
+      creatorId: user.id,
+      description: values.description,
+      type: values.type,
+      status: 'pendente', // Default status
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  
+    if (values.clientId) {
+      newTicketData.client.id = values.clientId;
+    }
+  
+    if (values.address?.street) {
+      newTicketData.client.address = `${values.address.street}, ${values.address.number || 'S/N'} - ${values.address.neighborhood}, ${values.address.city} - ${values.address.state}`;
+    }
+  
+    if (values.requesterName) {
+      newTicketData.requesterName = values.requesterName;
+    }
+  
+    if (values.assigneeId) {
+      newTicketData.technicianId = values.assigneeId;
+      newTicketData.status = 'em andamento';
+    }
+  
+    if (values.scheduledToDate) {
+      const timePart = values.scheduledToTime || '00:00:00';
+      const datePart = values.scheduledToDate.toISOString().split('T')[0];
+      newTicketData.scheduledTo = `${datePart}T${timePart}`;
+    }
+  
+    if (values.slaExpiresAt) {
+      newTicketData.slaExpiresAt = values.slaExpiresAt;
+    }
+  
+    try {
+      const docRef = await addDoc(collection(db, "external-tickets"), newTicketData);
+      
+      if (newTicketData.technicianId) {
+        const assignedTechnician = technicians.find(t => t.id === newTicketData.technicianId);
+        const techUser = users.find(u => u.id === assignedTechnician?.userId);
+        if (techUser?.phone) {
+            const message = `*Novo Chamado Atribuído no Nexus Service!*\n\n*Cliente:* ${newTicketData.client.name}\n*Contato:* ${newTicketData.client.phone || 'N/A'}\n*Endereço:* ${newTicketData.client.address || 'N/A'}\n*Solicitante:* ${newTicketData.requesterName || 'N/A'}\n\n*Descrição:* ${newTicketData.description}\n\n*Prioridade:* ${newTicketData.type}\n*Atribuído por:* ${user.name}`;
+            await sendWhatsappMessage(techUser.phone, message);
+        }
+      }
+      
+      await addDoc(collection(db, "system-logs"), {
+        userId: user.id,
+        event: 'EXTERNAL_TICKET_CREATED',
+        timestamp: new Date().toISOString(),
+        details: {
+            ticketId: docRef.id,
+            clientName: values.clientName,
+        }
+      });
+      
+      setIsNewTicketDialogOpen(false);
+      toast({
+        title: 'Chamado criado com sucesso!',
+        description: `O chamado para ${values.clientName} foi aberto.`,
+      });
+  
+    } catch (error) {
+       console.error("Error adding ticket: ", error);
+       toast({
+        variant: "destructive",
+        title: "Erro ao criar chamado",
+        description: "Ocorreu um erro ao salvar os dados. Tente novamente.",
+      });
+    }
+  }
+  
+  const handleViewDetails = (ticketId: string) => {
+    router.push(`/external-tickets/${ticketId}`);
+  };
+
+  const handleStatusChange = async (id: string, status: ExternalTicket['status']) => {
+    const ticketRef = doc(db, "external-tickets", id);
+    try {
+      await updateDoc(ticketRef, {
+        status,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error(`Error updating status for ticket ${id}:`, error);
+       toast({
+        variant: "destructive",
+        title: "Erro ao atualizar status",
+        description: "Não foi possível atualizar o chamado. Tente novamente.",
+      });
+    }
+  };
+
+  const handleAssignTicket = async (id: string) => {
+    if (!user) return;
+    const ticketRef = doc(db, "external-tickets", id);
+    try {
+        await updateDoc(ticketRef, {
+            technicianId: user.id,
+            status: 'em andamento',
+            updatedAt: new Date().toISOString(),
+        });
+        
+        if (user.phone) {
+            const ticket = tickets.find(t => t.id === id);
+            if (ticket) {
+              const message = `*Você Pegou um Chamado no Nexus Service!*\n\n*Cliente:* ${ticket.client.name}\n*Contato:* ${ticket.client.phone || 'N/A'}\n*Endereço:* ${ticket.client.address || 'N/A'}\n*Solicitante:* ${ticket.requesterName || 'N/A'}\n\n*Descrição:* ${ticket.description}\n\n*Prioridade:* ${ticket.type}`;
+              await sendWhatsappMessage(user.phone, message);
+            }
+        }
+
+        toast({ title: 'Chamado Atribuído!', description: `Você pegou o chamado #${id.substring(0,4)}.` });
+    } catch (error) {
+        console.error(`Error assigning ticket ${id}:`, error);
+        toast({ variant: 'destructive', title: 'Erro ao atribuir chamado.' });
+    }
+  }
+  
+  const handleSetEnRoute = async (ticketId: string) => {
+    if (!user || user.role !== 'tecnico') return;
+
+    const batch = writeBatch(db);
+    let targetTicket: ExternalTicket | undefined;
+
+    const enRouteTime = new Date().toISOString();
+
+    const ticketsToUpdate = tickets.map(t => {
+        if (t.technicianId === user.id) {
+            const isTarget = t.id === ticketId;
+            if (t.enRoute && !isTarget) {
+                const ticketRef = doc(db, "external-tickets", t.id);
+                batch.update(ticketRef, { enRoute: deleteField(), enRouteAt: deleteField() });
+            }
+            if (isTarget) {
+                const ticketRef = doc(db, "external-tickets", ticketId);
+                batch.update(ticketRef, { enRoute: true, enRouteAt: enRouteTime });
+                targetTicket = { ...t, enRoute: true, enRouteAt: enRouteTime };
+            }
+        }
+        return t;
+    });
+
+    try {
+        await batch.commit();
+        if (targetTicket) {
+            toast({
+                title: 'A caminho!',
+                description: `Próximo destino: ${targetTicket.client.name}.`,
+            });
+        }
+    } catch (error) {
+        console.error("Error setting en-route status:", error);
+        toast({ variant: "destructive", title: "Erro ao marcar rota", description: "Não foi possível atualizar o status. Tente novamente." });
+    }
+};
+
+  const handleReopenTicket = async (id: string) => {
+    const ticketRef = doc(db, "external-tickets", id);
+    try {
+      await updateDoc(ticketRef, {
+        status: 'pendente',
+        type: 'retorno',
+        technicianId: deleteField(),
+        updatedAt: new Date().toISOString(),
+      });
+      toast({
+        title: 'Chamado Reaberto com Sucesso!',
+        description: `O chamado #${id.substring(0,4)} foi movido para pendentes como retorno.`,
+      });
+    } catch (error) {
+      console.error("Error reopening ticket: ", error);
+       toast({
+        variant: "destructive",
+        title: "Erro ao reabrir chamado",
+        description: "Não foi possível atualizar o chamado. Tente novamente.",
+      });
+    }
+  };
+  
+  const handleCancelTicket = async (id: string) => {
+    await handleStatusChange(id, 'cancelado');
+    toast({
+      title: 'Chamado Cancelado',
+      description: `O chamado #${id.substring(0,4)} foi cancelado.`,
+    });
+  };
+
+  const handleConfirmAction = (action: 'reopen' | 'cancel' | 'take', ticket: ExternalTicket) => {
+    setConfirmation({ isOpen: true, action, ticket });
+  };
+
+  const executeConfirmedAction = async () => {
+    if (!confirmation.ticket || !confirmation.action) return;
+
+    const { ticket, action } = confirmation;
+
+    if (action === 'reopen') {
+        await handleReopenTicket(ticket.id);
+    } else if (action === 'cancel') {
+        await handleCancelTicket(ticket.id);
+    } else if (action === 'take') {
+        await handleAssignTicket(ticket.id);
+    }
+
+
+    setConfirmation({ isOpen: false, action: null, ticket: null });
+  };
+  
+  const getConfirmationMessage = () => {
+    switch (confirmation.action) {
+      case 'reopen': return 'reabrir';
+      case 'cancel': return 'cancelar';
+      case 'take': return 'pegar';
+      default: return 'executar esta ação';
+    }
+  };
+
+  const filteredTickets = tickets.filter(ticket => {
+    // Role-based visibility pre-filter
+    if (user?.role === 'encarregado') {
+        if (!user.sectorIds?.includes(ticket.sectorId)) return false;
+    } else if (user?.role === 'tecnico') {
+        // Technicians can see all tickets within their assigned sectors.
+        if (!user.sectorIds?.includes(ticket.sectorId)) {
+            return false;
+        }
+    }
+    
+    // Search Query Filter
+    const query = searchQuery.toLowerCase();
+    if (query && 
+        !ticket.client.name.toLowerCase().includes(query) &&
+        !ticket.description.toLowerCase().includes(query) &&
+        !(ticket.requesterName && ticket.requesterName.toLowerCase().includes(query))
+    ) {
+        return false;
+    }
+
+    // UI Filter
+    if (statusFilter !== 'all' && ticket.status !== statusFilter) {
+      return false;
+    }
+    if (technicianFilter !== 'all' && ticket.technicianId !== technicianFilter) {
+        return false;
+    }
+    if (sectorFilter !== 'all' && ticket.sectorId !== sectorFilter) {
+        return false;
+    }
+    if (contractOnly && ticket.type !== 'contrato') {
+      return false;
+    }
+    if (myTicketsOnly && user && ticket.technicianId !== user.id) {
+      return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    // If filtering by 'concluído', sort by update date (most recent first)
+    if (statusFilter === 'concluído') {
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    }
+      
+    // Default priority-based sorting for other statuses
+    const priorityOrder = {
+      'agendado-atrasado': -1,
+      'agendado-hoje': 0,
+      'retorno': 1,
+      'contrato': 2,
+      'urgente': 3,
+      'padrão': 4,
+      'agendado-futuro': 5,
+    };
+
+    const getPriority = (ticket: ExternalTicket) => {
+      if (ticket.type === 'agendado' && ticket.scheduledTo) {
+          const scheduledDate = parseISO(ticket.scheduledTo);
+          if (isPast(scheduledDate) && !isToday(scheduledDate)) {
+              return priorityOrder['agendado-atrasado'];
+          }
+          if (isToday(scheduledDate)) {
+              return priorityOrder['agendado-hoje'];
+          }
+          return priorityOrder['agendado-futuro'];
+      }
+      return priorityOrder[ticket.type as keyof typeof priorityOrder] ?? 99;
+    };
+
+    const priorityA = getPriority(a);
+    const priorityB = getPriority(b);
+
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+    
+    // If priorities are the same, sort by creation date (older first)
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+  
+  if (loading && tickets.length === 0) {
+    return (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
+  
+  const hasActiveRoute = filteredTickets.some(t => t.technicianId === user?.id && t.enRoute);
+
+
+  return (
+    <>
+    <Dialog open={isNewTicketDialogOpen} onOpenChange={setIsNewTicketDialogOpen}>
+      <PageHeader title="Chamados Externos" description="Gerencie os chamados de clientes externos.">
+        <div className="flex items-center gap-2">
+            {!isMobile && (
+                <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)}>
+                    <ToggleGroupItem value="kanban" aria-label="Kanban view"><LayoutDashboard className="h-4 w-4" /></ToggleGroupItem>
+                    <ToggleGroupItem value="list" aria-label="List view"><List className="h-4 w-4" /></ToggleGroupItem>
+                </ToggleGroup>
+            )}
+            <DialogTrigger asChild>
+                <Button>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Novo Chamado
+                </Button>
+            </DialogTrigger>
+        </div>
+      </PageHeader>
+      
+      <div 
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{ touchAction: 'pan-y' }}
+      >
+        <div
+            className="flex items-center justify-center p-4 text-muted-foreground transition-all duration-300"
+            style={{ height: pullDistance / 2, opacity: Math.min(pullDistance / 100, 1) }}
+        >
+            <RefreshCcw className={`h-6 w-6 ${pullDistance > 100 ? 'animate-spin' : ''}`} />
+        </div>
+
+        <div className="py-4">
+            <ExternalTicketsFilterBar
+            statusFilter={statusFilter}
+            onStatusChange={setStatusFilter}
+            technicianFilter={technicianFilter}
+            onTechnicianChange={setTechnicianFilter}
+            sectorFilter={sectorFilter}
+            onSectorChange={setSectorFilter}
+            contractOnly={contractOnly}
+            onContractOnlyChange={setContractOnly}
+            myTicketsOnly={myTicketsOnly}
+            onMyTicketsOnlyChange={setMyTicketsOnly}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            currentUser={user}
+            sectors={sectors}
+            />
+        </div>
+
+        {viewMode === 'kanban' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredTickets.map(ticket => (
+                <ExternalTicketCard 
+                    key={ticket.id} 
+                    ticket={ticket}
+                    users={users}
+                    sectors={sectors}
+                    currentUser={user}
+                    hasActiveRoute={hasActiveRoute}
+                    onViewDetails={() => handleViewDetails(ticket.id)}
+                    onConfirmAction={handleConfirmAction}
+                    onAssignToMe={() => handleConfirmAction('take', ticket)}
+                    onSetEnRoute={() => handleSetEnRoute(ticket.id)}
+                    onStatusChange={handleStatusChange}
+                />
+                ))}
+                {filteredTickets.length === 0 && !loading && (
+                <div className="col-span-full text-center text-muted-foreground py-10">
+                    Nenhum chamado encontrado com os filtros selecionados.
+                </div>
+                )}
+            </div>
+        ) : (
+            <ExternalTicketsTable 
+              data={filteredTickets} 
+              users={users} 
+              sectors={sectors} 
+              currentUser={user}
+              hasActiveRoute={hasActiveRoute}
+              onSetEnRoute={handleSetEnRoute}
+              onViewDetails={handleViewDetails}
+            />
+        )}
+      </div>
+
+       <DialogContent className="sm:max-w-4xl">
+            <DialogHeader>
+            <DialogTitle>Novo Chamado Externo</DialogTitle>
+            </DialogHeader>
+            <NewExternalTicketForm onFinished={() => setIsNewTicketDialogOpen(false)} onSave={handleAddTicket} />
+        </DialogContent>
+
+        <div className="fixed bottom-20 md:bottom-6 right-6 z-50">
+            <DialogTrigger asChild>
+                <Button size="icon" className="rounded-full h-14 w-14 shadow-lg">
+                    <PlusCircle className="h-6 w-6" />
+                    <span className="sr-only">Novo Chamado</span>
+                </Button>
+            </DialogTrigger>
+        </div>
+
+
+       <AlertDialog open={confirmation.isOpen} onOpenChange={(open) => !open && setConfirmation({isOpen: false, action: null, ticket: null})}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar Ação</AlertDialogTitle>
+                <AlertDialogDescription>
+                    {`Você tem certeza que deseja ${getConfirmationMessage()} este chamado?`}
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Voltar</AlertDialogCancel>
+                <AlertDialogAction onClick={executeConfirmedAction}>Confirmar</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Dialog>
+    </>
+  );
+}

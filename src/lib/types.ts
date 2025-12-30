@@ -1,0 +1,213 @@
+
+export type Role = 'admin' | 'gerente' | 'encarregado' | 'tecnico' | 'vendedor';
+export type UserStatus = 'active' | 'inactive' | 'pending_invitation';
+
+export type PermissionLevel = 'none' | 'read' | 'write';
+
+export interface ModulePermissions {
+  dashboard: PermissionLevel;
+  external_tickets: PermissionLevel;
+  internal_tickets: PermissionLevel;
+  routes: PermissionLevel;
+  planning: PermissionLevel;
+  reports: PermissionLevel;
+  history: PermissionLevel;
+  clients: PermissionLevel;
+  technicians: PermissionLevel;
+  location: PermissionLevel;
+  monitoring: PermissionLevel;
+}
+
+export type MobileNavPreferences = {
+    dashboard?: boolean;
+    schedule?: boolean;
+    external_tickets?: boolean;
+    internal_tickets?: boolean;
+    routes?: boolean;
+    location?: boolean;
+    planning?: boolean;
+    history?: boolean;
+    reports?: boolean;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: Role;
+  avatarUrl?: string;
+  sectorIds: string[]; 
+  status: UserStatus;
+  createdAt: string;
+  updatedAt: string;
+  permissions?: Partial<ModulePermissions>;
+  mobileNavPreferences?: MobileNavPreferences;
+}
+
+export interface Sector {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  status: 'active' | 'archived';
+}
+
+export interface RouteHistoryEntry {
+  date: string; // YYYY-MM-DD
+  routeOrder: string[];
+  finishedAt?: string;
+}
+
+export interface Technician {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  sectorIds: string[];
+  status: UserStatus;
+  routeOrder?: string[];
+  routeHistory?: RouteHistoryEntry[];
+}
+
+export interface Address {
+  street: string;
+  number?: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+}
+
+export interface PreventiveContract {
+  sectorIds: string[];
+  frequencyDays: number;
+}
+
+export interface Client {
+    id: string;
+    name: string;
+    document?: string; // CPF ou CNPJ
+    phone: string;
+    address: Address;
+    status: 'active' | 'inactive';
+    slaHours?: number;
+    preventiveContract?: PreventiveContract;
+}
+
+export interface SupportPoint {
+  id: string;
+  name: string;
+  address: Address;
+}
+
+export interface Comment {
+    id: string;
+    authorId: string;
+    content: string;
+    createdAt: string;
+}
+
+export interface TechnicalReport {
+    observations: string;
+    photos?: string[]; // URLs of the photos
+    signature?: string; // Data URL of the signature image
+}
+
+export interface ExternalTicket {
+  id: string;
+  client: {
+    id: string; 
+    name: string;
+    address?: string;
+    phone: string;
+    isWhats: boolean;
+  };
+  requesterName?: string;
+  sectorId: string;
+  creatorId: string;
+  technicianId?: string;
+  description: string;
+  type: 'padrão' | 'contrato' | 'urgente' | 'agendado' | 'retorno';
+  status: 'pendente' | 'em andamento' | 'concluído' | 'cancelado';
+  scheduledTo?: string;
+  createdAt: string;
+  updatedAt: string;
+  slaExpiresAt?: string;
+  checkIn?: {
+    ticketId: string;
+    timestamp: string;
+  };
+  checkOut?: {
+    ticketId: string;
+    timestamp: string;
+  };
+  enRoute?: boolean;
+  enRouteAt?: string;
+  comments?: Comment[];
+  technicalReport?: TechnicalReport;
+}
+
+export interface InternalTicket {
+  id: string;
+  title: string;
+  description?: string;
+  creatorId: string;
+  assigneeId?: string;
+  sectorId?: string;
+  status: 'pendente' | 'em andamento' | 'concluído' | 'cancelado';
+  isPriority?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  scheduledTo?: string;
+  comments?: Comment[];
+}
+
+export interface OptimizedRoute {
+    optimizedRoute: { ticketId: string; address: string }[];
+    explanation: string;
+    tickets: ExternalTicket[];
+}
+
+export interface AppNotification {
+    id: string;
+    title: string;
+    description: string;
+    createdAt: string;
+    href: string;
+}
+
+export type SystemLogEvent = 'EXTERNAL_TICKET_CREATED' | 'AI_CALL' | 'API_CALL';
+
+export interface SystemLog {
+    id: string;
+    userId: string;
+    event: SystemLogEvent;
+    timestamp: string;
+    details: Record<string, any>;
+}
+
+export interface TicketReportSummary {
+  summaryAndTrends: string;
+  improvementSuggestions: string;
+}
+
+export interface CalendarEvent {
+  title: string;
+  start: Date;
+  end: Date;
+  resource: ExternalTicket | InternalTicket;
+  type: 'external' | 'internal';
+}
+
+export interface PreventiveRoutePlan {
+  suggestedRoutes: {
+    day: number;
+    clients: {
+      id: string;
+      name: string;
+      address: string;
+    }[];
+  }[];
+  summary: string;
+}

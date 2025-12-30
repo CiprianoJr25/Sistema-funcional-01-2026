@@ -1,0 +1,318 @@
+
+'use client';
+
+import { useParams, useRouter } from 'next/navigation';
+import { ExternalTicketDetails } from '@/components/external-tickets/external-ticket-details';
+import { PageHeader } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import type { Comment, ExternalTicket, User, Sector, Technician, TechnicalReport } from '@/lib/types';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import { doc, onSnapshot, updateDoc, arrayUnion, collection, getDocs, deleteField } from 'firebase/firestore';
+import { db, storage } from '@/firebase/config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { sendWhatsappMessage } from '@/lib/services/notification-service';
+
+export default function ExternalTicketDetailsPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const ticketId = params.id as string;
+
+  const [ticket, setTicket] = useState<ExternalTicket | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [allSectors, setAllSectors] = useState<Sector[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [loading, setLoading] = useState(true);
+
+
+  useEffect(() => {
+    if (!ticketId) return;
+    setLoading(true);
+
+    const ticketRef = doc(db, "external-tickets", ticketId);
+    const unsubscribeTicket = onSnapshot(ticketRef, (ticketSnap) => {
+        if (ticketSnap.exists()) {
+          setTicket({ id: ticketSnap.id, ...ticketSnap.data() } as ExternalTicket);
+        } else {
+          toast({ variant: 'destructive', title: 'Chamado não encontrado' });
+          router.push('/external-tickets');
+        }
+    });
+
+    const fetchRelatedData = async () => {
+        try {
+            const [usersSnapshot, sectorsSnapshot, techsSnapshot] = await Promise.all([
+                getDocs(collection(db, "users")),
+                getDocs(collection(db, "sectors")),
+                getDocs(collection(db, "technicians"))
+            ]);
+            
+            setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+            setAllSectors(sectorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector)));
+            setTechnicians(techsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician)));
+        } catch (error) {
+            console.error("Error fetching related data: ", error);
+            toast({ variant: 'destructive', title: 'Erro ao carregar dados de suporte' });
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    fetchRelatedData();
+
+    return () => {
+      unsubscribeTicket();
+    };
+  }, [ticketId, router, toast]);
+
+  const handleAddComment = async (commentText: string) => {
+    if (!ticket || !user) return;
+
+    const newComment: Comment = {
+      id: `comment-${Date.now()}`,
+      authorId: user.id,
+      content: commentText,
+      createdAt: new Date().toISOString(),
+    };
+    
+    const ticketRef = doc(db, "external-tickets", ticket.id);
+
+    try {
+        await updateDoc(ticketRef, {
+            comments: arrayUnion(newComment)
+        });
+    } catch (error) {
+        console.error("Error adding comment: ", error);
+        toast({ variant: 'destructive', title: 'Erro ao adicionar comentário' });
+    }
+  };
+  
+  const handleStatusChange = async (id: string, status: ExternalTicket['status']) => {
+    const ticketRef = doc(db, "external-tickets", id);
+    try {
+      await updateDoc(ticketRef, {
+        status,
+        updatedAt: new Date().toISOString(),
+      });
+      toast({ title: 'Status do Chamado Atualizado!' });
+      if (status === 'concluído') {
+        router.back();
+      }
+    } catch (error) {
+      console.error(`Error updating status for ticket ${id}:`, error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao atualizar status",
+      });
+    }
+  };
+
+  const handleDescriptionChange = async (newDescription: string) => {
+    if (!ticket) return;
+    const ticketRef = doc(db, "external-tickets", ticket.id);
+    try {
+        await updateDoc(ticketRef, { description: newDescription });
+        toast({ title: 'Descrição atualizada com sucesso!' });
+    } catch (error) {
+        console.error('Error updating description:', error);
+        toast({ variant: 'destructive', title: 'Erro ao atualizar descrição' });
+    }
+  };
+
+  const handleAssignTechnician = async (technicianId: string) => {
+    if (!ticket || !user) return;
+    const ticketRef = doc(db, "external-tickets", ticket.id);
+    try {
+        await updateDoc(ticketRef, {
+            technicianId: technicianId,
+            status: 'em andamento',
+            updatedAt: new Date().toISOString(),
+        });
+        const assignedTechnician = technicians.find(t => t.id === technicianId);
+        const techUser = users.find(u => u.id === assignedTechnician?.userId);
+        
+        if (techUser?.phone) {
+            const message = `*Novo Chamado Atribuído no Nexus Service!*\n\n*Cliente:* ${ticket.client.name}\n*Contato:* ${ticket.client.phone || 'N/A'}\n*Endereço:* ${ticket.client.address || 'N/A'}\n*Solicitante:* ${ticket.requesterName || 'N/A'}\n\n*Descrição:* ${ticket.description}\n\n*Prioridade:* ${ticket.type}\n*Atribuído por:* ${user.name}`;
+            await sendWhatsappMessage(techUser.phone, message);
+        }
+
+        toast({
+            title: 'Chamado Atribuído!',
+            description: `Chamado #${ticket.id.substring(0,4)} atribuído a ${assignedTechnician?.name || 'técnico'}.`
+        });
+    } catch (error) {
+        console.error('Error assigning technician:', error);
+        toast({ variant: 'destructive', title: 'Erro ao atribuir chamado' });
+    }
+  };
+  
+const handleFinalizeTicket = async (id: string, observations: string, photos: File[], signatureDataUrl?: string): Promise<boolean> => {
+    const ticketRef = doc(db, "external-tickets", id);
+    try {
+        const photoURLs = await Promise.all(
+            photos.map(async (photo) => {
+                const photoRef = ref(storage, `tickets/${id}/${Date.now()}-${photo.name}`);
+                await uploadBytes(photoRef, photo);
+                return await getDownloadURL(photoRef);
+            })
+        );
+        
+        const newTechnicalReport: TechnicalReport = {
+            observations: observations,
+            photos: photoURLs,
+            ...(signatureDataUrl && { signature: signatureDataUrl }),
+        };
+
+        const finalizationTime = new Date().toISOString();
+
+        await updateDoc(ticketRef, {
+            status: 'concluído',
+            updatedAt: finalizationTime,
+            technicalReport: newTechnicalReport,
+            checkOut: {
+                ticketId: id,
+                timestamp: finalizationTime,
+            }
+        });
+
+        toast({ title: 'Chamado Finalizado com Sucesso!' });
+        router.back();
+        return true;
+
+    } catch (error) {
+        console.error(`Error finalizing ticket ${id}:`, error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao finalizar chamado",
+            description: "Não foi possível salvar o relatório técnico. Verifique as permissões do Storage e tente novamente.",
+        });
+        return false;
+    }
+};
+
+  
+  const handleReopenTicket = async (id: string) => {
+    const ticketRef = doc(db, "external-tickets", id);
+    try {
+        await updateDoc(ticketRef, {
+            status: 'pendente',
+            type: 'retorno',
+            technicianId: deleteField(),
+            updatedAt: new Date().toISOString(),
+        });
+        toast({
+            title: 'Chamado Reaberto com Sucesso!',
+            description: `O chamado #${id} foi movido para pendentes como retorno.`,
+        });
+        router.push('/external-tickets');
+    } catch (error) {
+        console.error("Error reopening ticket: ", error);
+        toast({ variant: 'destructive', title: 'Erro ao reabrir chamado' });
+    }
+  };
+
+  const handleReturnToPending = async (id: string) => {
+    const ticketRef = doc(db, "external-tickets", id);
+    try {
+      await updateDoc(ticketRef, {
+        status: 'pendente',
+        technicianId: deleteField(),
+        updatedAt: new Date().toISOString(),
+      });
+      toast({
+        title: 'Chamado Devolvido!',
+        description: `O chamado #${id} retornou para la fila de pendentes.`,
+      });
+      router.push('/external-tickets');
+    } catch (error) {
+      console.error("Error returning ticket to pending:", error);
+      toast({ variant: 'destructive', title: 'Erro ao devolver chamado' });
+    }
+  };
+
+  const handleAssignTicketToCurrentUser = async () => {
+    if (!ticket || !user) return;
+
+    const ticketRef = doc(db, "external-tickets", ticket.id);
+    try {
+      await updateDoc(ticketRef, {
+        technicianId: user.id,
+        status: 'em andamento',
+        updatedAt: new Date().toISOString(),
+      });
+      
+      if (user.phone) {
+        const message = `*Você Pegou um Chamado no Nexus Service!*\n\n*Cliente:* ${ticket.client.name}\n*Contato:* ${ticket.client.phone || 'N/A'}\n*Endereço:* ${ticket.client.address || 'N/A'}\n*Solicitante:* ${ticket.requesterName || 'N/A'}\n\n*Descrição:* ${ticket.description}\n\n*Prioridade:* ${ticket.type}`;
+        await sendWhatsappMessage(user.phone, message);
+      }
+
+      toast({
+        title: 'Chamado Atribuído!',
+        description: `Você pegou o chamado #${ticket.id}.`,
+      });
+    } catch (error) {
+      console.error("Error assigning ticket: ", error);
+      toast({ variant: 'destructive', title: 'Erro ao atribuir chamado' });
+    }
+  };
+
+  const handleCheckIn = async () => {
+    if (!ticket) return;
+    const ticketRef = doc(db, "external-tickets", ticket.id);
+    try {
+        await updateDoc(ticketRef, {
+            checkIn: {
+                ticketId: ticket.id,
+                timestamp: new Date().toISOString(),
+            }
+        });
+        toast({ title: 'Check-in realizado!', description: `Você iniciou o atendimento no cliente ${ticket.client.name}.` });
+    } catch (error) {
+        console.error("Error performing check-in:", error);
+        toast({ variant: 'destructive', title: 'Erro ao fazer check-in' });
+    }
+  };
+
+
+  if (loading || !ticket || users.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="text-lg text-muted-foreground">Carregando chamado...</p>
+        <Button variant="link" onClick={() => router.back()}>
+          Voltar
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+        <PageHeader title="Detalhes do Chamado" description={`Chamado #${ticket.id.substring(0, 8)}...`}>
+            <Button variant="outline" onClick={() => router.back()}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Voltar
+            </Button>
+        </PageHeader>
+        <ExternalTicketDetails 
+            ticket={ticket} 
+            onAddComment={handleAddComment}
+            onReopenTicket={handleReopenTicket}
+            onAssignToMe={handleAssignTicketToCurrentUser}
+            onFinalizeTicket={handleFinalizeTicket}
+            onReturnToPending={handleReturnToPending}
+            onDescriptionChange={handleDescriptionChange}
+            onAssignTechnician={handleAssignTechnician}
+            onCheckIn={handleCheckIn}
+            currentUser={user}
+            users={users}
+            allTechnicians={technicians}
+            allSectors={allSectors}
+        />
+    </>
+  );
+}
