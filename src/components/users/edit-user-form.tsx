@@ -33,6 +33,7 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "O nome é obrigatório." }),
   phone: z.string().optional(),
   role: z.enum(["gerente", "encarregado", "vendedor"], { required_error: "Selecione um cargo." }),
+  storeId: z.enum(["EUROINFO", "RONDOINFO"], { required_error: "Selecione uma loja." }),
   sectorIds: z.array(z.string()).optional(),
 }).refine(data => !(data.role === 'encarregado' && (!data.sectorIds || data.sectorIds.length === 0)), {
     message: "O setor é obrigatório para encarregados.",
@@ -58,6 +59,7 @@ export function EditUserForm({ user, onSave, onFinished, sectors }: EditUserForm
       name: user.name,
       phone: user.phone || "",
       role: user.role as 'gerente' | 'encarregado' | 'vendedor',
+      storeId: user.storeId,
       sectorIds: user.sectorIds || [],
     },
   });
@@ -100,6 +102,27 @@ export function EditUserForm({ user, onSave, onFinished, sectors }: EditUserForm
               </FormItem>
             )}
           />
+           <FormField
+                control={form.control}
+                name="storeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Loja</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a loja de origem" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="EUROINFO">EUROINFO</SelectItem>
+                        <SelectItem value="RONDOINFO">RONDOINFO</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+            />
           <FormField
             control={form.control}
             name="role"

@@ -74,6 +74,7 @@ export default function TechniciansPage() {
                 name: correspondingUser?.name || techData.name,
                 email: correspondingUser?.email || techData.email,
                 phone: correspondingUser?.phone || (techData as any).phone,
+                storeId: correspondingUser?.storeId || techData.storeId,
             };
         });
 
@@ -133,6 +134,7 @@ export default function TechniciansPage() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         avatarUrl: "",
+        storeId: values.storeId,
         sectorIds: [values.sectorId],
       };
       await setDoc(doc(db, "users", newUserId), newUser);
@@ -142,6 +144,7 @@ export default function TechniciansPage() {
         name: values.name,
         email: values.email,
         status: 'active',
+        storeId: values.storeId,
         sectorIds: [values.sectorId]
       };
       await setDoc(doc(db, "technicians", newUserId), newTechnician);
@@ -187,11 +190,12 @@ export default function TechniciansPage() {
         name: values.name,
         phone: values.phone,
         sectorIds: values.sectorIds,
+        storeId: values.storeId,
         updatedAt: new Date().toISOString(),
     };
     
     batch.update(userRef, updateData);
-    batch.update(techRef, { name: values.name, sectorIds: values.sectorIds });
+    batch.update(techRef, { name: values.name, sectorIds: values.sectorIds, storeId: values.storeId });
 
     try {
         await batch.commit();

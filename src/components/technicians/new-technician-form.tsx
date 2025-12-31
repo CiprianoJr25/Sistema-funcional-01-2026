@@ -31,6 +31,7 @@ const formSchema = z.object({
   email: z.string().email({ message: "Email inválido." }),
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   phone: z.string().optional(),
+  storeId: z.enum(["EUROINFO", "RONDOINFO"], { required_error: "Selecione uma loja." }),
   sectorId: z.string({ required_error: "Selecione um setor." }),
 });
 
@@ -52,6 +53,7 @@ export function NewTechnicianForm({ onSave, onFinished, sectors }: NewTechnician
       email: "",
       password: "",
       phone: "",
+      storeId: undefined,
       // If user is an encarregado with only one sector, pre-select it.
       sectorId: user?.role === 'encarregado' && user.sectorIds?.length === 1 ? user.sectorIds[0] : undefined,
     },
@@ -134,7 +136,27 @@ export function NewTechnicianForm({ onSave, onFinished, sectors }: NewTechnician
               </FormItem>
             )}
           />
-          
+          <FormField
+                control={form.control}
+                name="storeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Loja</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a loja de origem" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="EUROINFO">EUROINFO</SelectItem>
+                        <SelectItem value="RONDOINFO">RONDOINFO</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+            />
             <FormField
               control={form.control}
               name="sectorId"

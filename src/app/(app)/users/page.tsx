@@ -83,6 +83,7 @@ export default function UsersPage() {
             status: 'active',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
+            storeId: values.storeId,
             avatarUrl: "",
             ...(values.sectorIds && values.sectorIds.length > 0 && { sectorIds: values.sectorIds }),
         };
@@ -117,6 +118,7 @@ export default function UsersPage() {
         name: values.name,
         phone: values.phone,
         role: values.role,
+        storeId: values.storeId,
         sectorIds: values.role === 'encarregado' ? values.sectorIds : [],
         updatedAt: new Date().toISOString(),
       };

@@ -26,11 +26,13 @@ import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown, ArrowLeft, ArrowRight } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 import React from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "O nome é obrigatório." }),
   document: z.string().optional(),
   phone: z.string().min(10, { message: "O telefone é obrigatório." }),
+  storeId: z.enum(["EUROINFO", "RONDOINFO"], { required_error: "Selecione uma loja." }),
   address: z.object({
     street: z.string().min(2, { message: "O logradouro é obrigatório."}),
     number: z.string().optional(),
@@ -97,6 +99,7 @@ export function NewClientForm({ onSave, onFinished }: NewClientFormProps) {
         name: "",
         document: "",
         phone: "",
+        storeId: undefined,
         address: {
             street: "",
             number: "",
@@ -115,7 +118,7 @@ export function NewClientForm({ onSave, onFinished }: NewClientFormProps) {
   async function handleNextStep() {
     let fieldsToValidate: (keyof NewClientFormValues)[] = [];
     if (currentStep === 1) {
-        fieldsToValidate = ['name', 'phone'];
+        fieldsToValidate = ['name', 'phone', 'storeId'];
     } else if (currentStep === 2) {
         fieldsToValidate = ['address.street', 'address.neighborhood', 'address.city', 'address.state'];
     }
@@ -211,6 +214,27 @@ export function NewClientForm({ onSave, onFinished }: NewClientFormProps) {
                     <FormControl>
                       <Input placeholder="(99) 99999-9999" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="storeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Loja</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a loja de origem" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="EUROINFO">EUROINFO</SelectItem>
+                        <SelectItem value="RONDOINFO">RONDOINFO</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

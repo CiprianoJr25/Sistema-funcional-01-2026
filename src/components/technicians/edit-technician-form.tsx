@@ -21,10 +21,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "O nome é obrigatório." }),
   phone: z.string().optional(),
+  storeId: z.enum(["EUROINFO", "RONDOINFO"], { required_error: "Selecione uma loja." }),
   sectorIds: z.array(z.string()).min(1, { message: "Selecione pelo menos um setor." }),
 });
 
@@ -45,6 +47,7 @@ export function EditTechnicianForm({ technician, onSave, onFinished, sectors }: 
     defaultValues: {
       name: technician.name,
       phone: (technician as any).phone || "",
+      storeId: technician.storeId,
       sectorIds: technician.sectorIds || [],
     },
   });
@@ -88,6 +91,27 @@ export function EditTechnicianForm({ technician, onSave, onFinished, sectors }: 
               </FormItem>
             )}
           />
+          <FormField
+                control={form.control}
+                name="storeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Loja</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a loja de origem" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="EUROINFO">EUROINFO</SelectItem>
+                        <SelectItem value="RONDOINFO">RONDOINFO</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+            />
           <FormField
             control={form.control}
             name="sectorIds"

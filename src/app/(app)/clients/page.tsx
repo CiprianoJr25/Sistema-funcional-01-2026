@@ -60,6 +60,7 @@ export default function ClientsPage() {
         phone: values.phone,
         address: values.address,
         status: 'active',
+        storeId: values.storeId,
         ...(values.preventiveContract && { preventiveContract: values.preventiveContract }),
       };
       

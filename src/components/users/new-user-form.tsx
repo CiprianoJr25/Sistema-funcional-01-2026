@@ -35,6 +35,7 @@ const formSchema = z.object({
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   phone: z.string().optional(),
   role: z.enum(["gerente", "encarregado", "vendedor"], { required_error: "Selecione um cargo." }),
+  storeId: z.enum(["EUROINFO", "RONDOINFO"], { required_error: "Selecione uma loja." }),
   sectorIds: z.array(z.string()).optional(),
 }).refine(data => !(data.role === 'encarregado' && (!data.sectorIds || data.sectorIds.length === 0)), {
     message: "O setor é obrigatório para encarregados.",
@@ -59,6 +60,7 @@ export function NewUserForm({ onSave, onFinished, sectors }: NewUserFormProps) {
       password: "",
       phone: "",
       role: undefined,
+      storeId: undefined,
       sectorIds: [],
     },
   });
@@ -128,6 +130,27 @@ export function NewUserForm({ onSave, onFinished, sectors }: NewUserFormProps) {
               </FormItem>
             )}
           />
+           <FormField
+                control={form.control}
+                name="storeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Loja</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a loja de origem" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="EUROINFO">EUROINFO</SelectItem>
+                        <SelectItem value="RONDOINFO">RONDOINFO</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+            />
           <FormField
             control={form.control}
             name="role"
