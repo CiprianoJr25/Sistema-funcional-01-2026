@@ -8,17 +8,15 @@ import { NavLinks } from "@/components/nav-links";
 import { UserNav } from "@/components/user-nav";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarSeparator, SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarSeparator, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { useOptionalSidebar } from '@/components/ui/sidebar';
 
 
-function AppLayoutContent({ children }: { children: React.ReactNode }) {
+export default function AppLayout({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
     const router = useRouter();
     const sidebar = useOptionalSidebar();
-    const isMobile = useIsMobile();
    
     useEffect(() => {
       if (!loading && !user) {
@@ -83,13 +81,5 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           </main>
         </SidebarInset>
       </>
-    )
-  }
-  
-  export default function AppLayout({ children }: { children: React.ReactNode }) {
-    return (
-      <SidebarProvider>
-        <AppLayoutContent>{children}</AppLayoutContent>
-      </SidebarProvider>
     )
   }
