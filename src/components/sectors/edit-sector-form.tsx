@@ -23,6 +23,8 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
   code: z.string().min(1, { message: "O código é obrigatório." }),
   description: z.string().optional(),
+  euroInfoId: z.string().optional(),
+  rondoInfoId: z.string().optional(),
 });
 
 export type EditSectorFormValues = z.infer<typeof formSchema>;
@@ -42,6 +44,8 @@ export function EditSectorForm({ sector, onSave, onFinished }: EditSectorFormPro
       name: sector.name,
       code: sector.code,
       description: sector.description || "",
+      euroInfoId: sector.euroInfoId || "",
+      rondoInfoId: sector.rondoInfoId || "",
     },
   });
 
@@ -94,6 +98,34 @@ export function EditSectorForm({ sector, onSave, onFinished }: EditSectorFormPro
               </FormItem>
             )}
           />
+          <div className="grid grid-cols-2 gap-4">
+             <FormField
+                control={form.control}
+                name="euroInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID EuroInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+             <FormField
+                control={form.control}
+                name="rondoInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID RondoInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+          </div>
         </div>
         <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={onFinished} disabled={isSaving}>Cancelar</Button>

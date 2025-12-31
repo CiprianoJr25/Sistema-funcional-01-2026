@@ -53,6 +53,8 @@ export interface Sector {
   code: string;
   description?: string;
   status: 'active' | 'archived';
+  euroInfoId?: string;
+  rondoInfoId?: string;
 }
 
 export interface RouteHistoryEntry {
