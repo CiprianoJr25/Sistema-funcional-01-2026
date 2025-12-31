@@ -32,7 +32,6 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "O nome é obrigatório." }),
   document: z.string().optional(),
   phone: z.string().min(10, { message: "O telefone é obrigatório." }),
-  storeId: z.enum(["EUROINFO", "RONDOINFO"], { required_error: "Selecione uma loja." }),
   address: z.object({
     street: z.string().min(2, { message: "O logradouro é obrigatório."}),
     number: z.string().optional(),
@@ -47,7 +46,9 @@ const formSchema = z.object({
   preventiveContract: z.object({
     sectorIds: z.array(z.string()).refine(value => value.length > 0, { message: "Selecione pelo menos um setor." }),
     frequencyDays: z.coerce.number().positive({ message: "A frequência deve ser maior que zero." }),
-  }).optional()
+  }).optional(),
+  euroInfoId: z.string().optional(),
+  rondoInfoId: z.string().optional(),
 }).refine(data => {
     if (data.hasPreventiveContract) {
         return !!data.preventiveContract;
@@ -99,7 +100,6 @@ export function NewClientForm({ onSave, onFinished }: NewClientFormProps) {
         name: "",
         document: "",
         phone: "",
-        storeId: undefined,
         address: {
             street: "",
             number: "",
@@ -112,13 +112,15 @@ export function NewClientForm({ onSave, onFinished }: NewClientFormProps) {
         slaHours: undefined,
         hasPreventiveContract: false,
         preventiveContract: undefined,
+        euroInfoId: "",
+        rondoInfoId: "",
     },
   });
 
   async function handleNextStep() {
     let fieldsToValidate: (keyof NewClientFormValues)[] = [];
     if (currentStep === 1) {
-        fieldsToValidate = ['name', 'phone', 'storeId'];
+        fieldsToValidate = ['name', 'phone'];
     } else if (currentStep === 2) {
         fieldsToValidate = ['address.street', 'address.neighborhood', 'address.city', 'address.state'];
     }
@@ -218,27 +220,34 @@ export function NewClientForm({ onSave, onFinished }: NewClientFormProps) {
                   </FormItem>
                 )}
               />
-               <FormField
-                control={form.control}
-                name="storeId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Loja</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a loja de origem" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="EUROINFO">EUROINFO</SelectItem>
-                        <SelectItem value="RONDOINFO">RONDOINFO</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                 <FormField
+                    control={form.control}
+                    name="euroInfoId"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>ID EuroInfo</FormLabel>
+                        <FormControl>
+                        <Input placeholder="ID do sistema legado" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="rondoInfoId"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>ID RondoInfo</FormLabel>
+                        <FormControl>
+                        <Input placeholder="ID do sistema legado" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+              </div>
             </div>
           )}
 

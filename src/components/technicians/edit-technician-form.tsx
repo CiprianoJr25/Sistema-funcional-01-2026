@@ -21,13 +21,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "O nome é obrigatório." }),
   phone: z.string().optional(),
-  storeId: z.enum(["EUROINFO", "RONDOINFO"], { required_error: "Selecione uma loja." }),
   sectorIds: z.array(z.string()).min(1, { message: "Selecione pelo menos um setor." }),
+  euroInfoId: z.string().optional(),
+  rondoInfoId: z.string().optional(),
 });
 
 export type EditTechnicianFormValues = z.infer<typeof formSchema>;
@@ -47,8 +47,9 @@ export function EditTechnicianForm({ technician, onSave, onFinished, sectors }: 
     defaultValues: {
       name: technician.name,
       phone: (technician as any).phone || "",
-      storeId: technician.storeId,
       sectorIds: technician.sectorIds || [],
+      euroInfoId: technician.euroInfoId || "",
+      rondoInfoId: technician.rondoInfoId || "",
     },
   });
 
@@ -91,27 +92,34 @@ export function EditTechnicianForm({ technician, onSave, onFinished, sectors }: 
               </FormItem>
             )}
           />
-          <FormField
+           <div className="grid grid-cols-2 gap-4">
+             <FormField
                 control={form.control}
-                name="storeId"
+                name="euroInfoId"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Loja</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a loja de origem" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="EUROINFO">EUROINFO</SelectItem>
-                        <SelectItem value="RONDOINFO">RONDOINFO</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <FormItem>
+                    <FormLabel>ID EuroInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
                     <FormMessage />
-                  </FormItem>
+                </FormItem>
                 )}
             />
+             <FormField
+                control={form.control}
+                name="rondoInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID RondoInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+          </div>
           <FormField
             control={form.control}
             name="sectorIds"

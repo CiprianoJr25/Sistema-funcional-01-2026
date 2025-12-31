@@ -83,9 +83,11 @@ export default function UsersPage() {
             status: 'active',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            storeId: values.storeId,
+            sectorIds: [],
             avatarUrl: "",
             ...(values.sectorIds && values.sectorIds.length > 0 && { sectorIds: values.sectorIds }),
+            ...(values.euroInfoId && { euroInfoId: values.euroInfoId }),
+            ...(values.rondoInfoId && { rondoInfoId: values.rondoInfoId }),
         };
 
         // Save user profile to Firestore
@@ -118,9 +120,10 @@ export default function UsersPage() {
         name: values.name,
         phone: values.phone,
         role: values.role,
-        storeId: values.storeId,
         sectorIds: values.role === 'encarregado' ? values.sectorIds : [],
         updatedAt: new Date().toISOString(),
+        euroInfoId: values.euroInfoId,
+        rondoInfoId: values.rondoInfoId,
       };
 
       await updateDoc(userDocRef, updateData);

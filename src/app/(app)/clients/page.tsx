@@ -60,8 +60,9 @@ export default function ClientsPage() {
         phone: values.phone,
         address: values.address,
         status: 'active',
-        storeId: values.storeId,
         ...(values.preventiveContract && { preventiveContract: values.preventiveContract }),
+        ...(values.euroInfoId && { euroInfoId: values.euroInfoId }),
+        ...(values.rondoInfoId && { rondoInfoId: values.rondoInfoId }),
       };
       
       const docRef = await addDoc(collection(db, "clients"), newClientData);

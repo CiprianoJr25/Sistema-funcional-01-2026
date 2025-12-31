@@ -35,8 +35,9 @@ const formSchema = z.object({
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   phone: z.string().optional(),
   role: z.enum(["gerente", "encarregado", "vendedor"], { required_error: "Selecione um cargo." }),
-  storeId: z.enum(["EUROINFO", "RONDOINFO"], { required_error: "Selecione uma loja." }),
   sectorIds: z.array(z.string()).optional(),
+  euroInfoId: z.string().optional(),
+  rondoInfoId: z.string().optional(),
 }).refine(data => !(data.role === 'encarregado' && (!data.sectorIds || data.sectorIds.length === 0)), {
     message: "O setor é obrigatório para encarregados.",
     path: ["sectorIds"],
@@ -60,8 +61,9 @@ export function NewUserForm({ onSave, onFinished, sectors }: NewUserFormProps) {
       password: "",
       phone: "",
       role: undefined,
-      storeId: undefined,
       sectorIds: [],
+      euroInfoId: "",
+      rondoInfoId: "",
     },
   });
 
@@ -130,27 +132,34 @@ export function NewUserForm({ onSave, onFinished, sectors }: NewUserFormProps) {
               </FormItem>
             )}
           />
-           <FormField
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
                 control={form.control}
-                name="storeId"
+                name="euroInfoId"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Loja</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a loja de origem" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="EUROINFO">EUROINFO</SelectItem>
-                        <SelectItem value="RONDOINFO">RONDOINFO</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <FormItem>
+                    <FormLabel>ID EuroInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
                     <FormMessage />
-                  </FormItem>
+                </FormItem>
                 )}
             />
+            <FormField
+                control={form.control}
+                name="rondoInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID RondoInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+          </div>
           <FormField
             control={form.control}
             name="role"

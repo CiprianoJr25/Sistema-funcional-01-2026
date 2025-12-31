@@ -43,7 +43,8 @@ export interface User {
   updatedAt: string;
   permissions?: Partial<ModulePermissions>;
   mobileNavPreferences?: MobileNavPreferences;
-  storeId?: 'EUROINFO' | 'RONDOINFO';
+  euroInfoId?: string;
+  rondoInfoId?: string;
 }
 
 export interface Sector {
@@ -69,7 +70,8 @@ export interface Technician {
   status: UserStatus;
   routeOrder?: string[];
   routeHistory?: RouteHistoryEntry[];
-  storeId?: 'EUROINFO' | 'RONDOINFO';
+  euroInfoId?: string;
+  rondoInfoId?: string;
 }
 
 export interface Address {
@@ -95,7 +97,8 @@ export interface Client {
     status: 'active' | 'inactive';
     slaHours?: number;
     preventiveContract?: PreventiveContract;
-    storeId?: 'EUROINFO' | 'RONDOINFO';
+    euroInfoId?: string;
+    rondoInfoId?: string;
 }
 
 export interface SupportPoint {

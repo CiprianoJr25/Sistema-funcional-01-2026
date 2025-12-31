@@ -43,6 +43,8 @@ const formSchema = z.object({
     sectorIds: z.array(z.string()).refine(value => value.length > 0, { message: "Selecione pelo menos um setor." }),
     frequencyDays: z.coerce.number().positive({ message: "A frequência deve ser maior que zero." }),
   }).optional(),
+  euroInfoId: z.string().optional(),
+  rondoInfoId: z.string().optional(),
 });
 
 
@@ -84,7 +86,9 @@ export function EditClientForm({ client, onSave, onFinished }: EditClientFormPro
         preventiveContract: client.preventiveContract ? {
             sectorIds: client.preventiveContract.sectorIds,
             frequencyDays: client.preventiveContract.frequencyDays,
-        } : { sectorIds: [], frequencyDays: 30 }
+        } : { sectorIds: [], frequencyDays: 30 },
+        euroInfoId: client.euroInfoId,
+        rondoInfoId: client.rondoInfoId,
     },
   });
   
@@ -141,6 +145,34 @@ export function EditClientForm({ client, onSave, onFinished }: EditClientFormPro
                   </FormItem>
                 )}
               />
+              <div className="grid grid-cols-2 gap-4">
+                 <FormField
+                    control={form.control}
+                    name="euroInfoId"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>ID EuroInfo</FormLabel>
+                        <FormControl>
+                        <Input placeholder="ID do sistema legado" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="rondoInfoId"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>ID RondoInfo</FormLabel>
+                        <FormControl>
+                        <Input placeholder="ID do sistema legado" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+              </div>
 
             {/* Endereço */}
             <h3 className="text-lg font-medium border-b pb-2 pt-4">Endereço</h3>
