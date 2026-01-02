@@ -4,19 +4,23 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Permite que qualquer usuário autenticado leia arquivos (para visualizar fotos).
+    // Regra Genérica de Leitura: Permite que qualquer usuário autenticado leia arquivos.
+    // Isso é útil para exibir imagens de perfil, fotos de chamados, etc., em toda a aplicação.
     allow read: if request.auth != null;
 
-    // Permite que um usuário autenticado escreva qualquer arquivo dentro de sua própria pasta de avatar.
+    // Regras de Escrita Específicas por Caminho
+
+    // Permite que um usuário escreva (crie, atualize, delete) arquivos apenas
+    // dentro de sua própria pasta de avatar.
     match /avatars/{userId}/{allPaths=**} {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Permite que qualquer usuário autenticado adicione arquivos a um chamado.
+    // Permite que qualquer usuário autenticado adicione/atualize arquivos
+    // em qualquer pasta de chamado. A lógica da aplicação deve garantir que
+    // apenas usuários autorizados (como o técnico do chamado) façam o upload.
     match /tickets/{ticketId}/{allPaths=**} {
       allow write: if request.auth != null;
     }
   }
 }
-
-    
