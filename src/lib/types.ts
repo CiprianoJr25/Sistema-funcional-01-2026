@@ -110,7 +110,7 @@ export interface Client {
     address: Address;
     status: 'active' | 'inactive';
     slaHours?: number;
-    // O preventiveContract será removido para dar lugar ao ServiceContract
+    // O preventiveContract é mantido para a nova lógica de planejamento
     preventiveContract?: PreventiveContract;
     euroInfoId?: string;
     rondoInfoId?: string;

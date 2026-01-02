@@ -12,8 +12,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ServiceContract, Client, Sector } from "@/lib/types";
-import { collection, addDoc, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { ServiceContract, Client, Sector, ExternalTicket } from "@/lib/types";
+import { collection, addDoc, onSnapshot, doc, updateDoc, writeBatch } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -74,11 +74,13 @@ export default function ContractsPage() {
         return;
     }
     const client = clients.find(c => c.id === values.clientId);
-    if (!client) {
-        toast({ variant: 'destructive', title: "Cliente não encontrado"});
+    if (!client || !client.address) {
+        toast({ variant: 'destructive', title: "Cliente ou endereço não encontrado"});
         return;
     }
     try {
+      const batch = writeBatch(db);
+
       const newContractData: Omit<ServiceContract, 'id'> = {
         clientId: values.clientId,
         clientName: client.name,
@@ -89,16 +91,51 @@ export default function ContractsPage() {
         updatedAt: new Date().toISOString(),
       };
       
-      await addDoc(collection(db, "serviceContracts"), newContractData);
+      const contractRef = doc(collection(db, "serviceContracts"));
+      batch.set(contractRef, newContractData);
+      
+      // Update the client document with the contract info
+      const clientRef = doc(db, "clients", client.id);
+      batch.update(clientRef, {
+        preventiveContract: {
+          sectorIds: values.sectorIds,
+          frequencyDays: values.frequencyDays,
+        }
+      });
+      
+      // Create initial tickets for each sector in the contract
+      for (const sectorId of values.sectorIds) {
+          const ticketRef = doc(collection(db, "external-tickets"));
+          const newTicketData: Omit<ExternalTicket, 'id'> = {
+              client: {
+                id: client.id,
+                name: client.name,
+                phone: client.phone,
+                address: `${client.address.street}, ${client.address.number || 'S/N'}`,
+                isWhats: false, // Pode ser um padrão ou vir do form
+              },
+              requesterName: 'Sistema (Criação de Contrato)',
+              sectorId: sectorId,
+              creatorId: user.id,
+              description: `Chamado inicial de manutenção preventiva (Contrato ${contractRef.id.substring(0, 5)}).`,
+              type: 'contrato',
+              status: 'pendente',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+          };
+          batch.set(ticketRef, newTicketData);
+      }
+
+      await batch.commit();
       
       toast({
-        title: "Contrato adicionado com sucesso!",
-        description: `O contrato para ${client.name} foi criado.`,
+        title: "Contrato e chamados iniciais criados!",
+        description: `O contrato para ${client.name} e os chamados preventivos foram gerados.`,
       });
       setIsNewDialogOpen(false);
 
     } catch (error) {
-      console.error("Error adding contract: ", error);
+      console.error("Error adding contract and tickets: ", error);
       toast({
         variant: "destructive",
         title: "Erro ao adicionar contrato",
@@ -108,13 +145,26 @@ export default function ContractsPage() {
   };
 
   const handleUpdateContract = async (contractId: string, values: EditContractFormValues) => {
+    const batch = writeBatch(db);
     const contractRef = doc(db, "serviceContracts", contractId);
+    
     try {
+        const contractSnap = await doc(db, "serviceContracts", contractId).get();
+        const contractData = contractSnap.data() as ServiceContract;
+        const clientRef = doc(db, "clients", contractData.clientId);
+        
         const updatedData = { 
             ...values,
             updatedAt: new Date().toISOString(),
         };
-        await updateDoc(contractRef, updatedData);
+
+        batch.update(contractRef, updatedData);
+        batch.update(clientRef, {
+           'preventiveContract.frequencyDays': values.frequencyDays,
+           'preventiveContract.sectorIds': values.sectorIds,
+        });
+
+        await batch.commit();
         toast({ title: "Contrato atualizado com sucesso!" });
         return true;
     } catch (error) {

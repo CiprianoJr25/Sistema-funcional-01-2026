@@ -4,8 +4,8 @@
 
 import { collection, getDocs, addDoc, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/firebase/config';
-import { Client, ExternalTicket } from '@/lib/types';
-import { differenceInDays } from 'date-fns';
+import { Client, ExternalTicket, ServiceContract } from '@/lib/types';
+import { differenceInDays, parseISO } from 'date-fns';
 
 /**
  * Busca o último chamado preventivo para um cliente específico e um setor específico.
@@ -19,7 +19,7 @@ async function findLastPreventiveTicket(clientId: string, sectorId: string): Pro
     ticketsRef,
     where('client.id', '==', clientId),
     where('sectorId', '==', sectorId),
-    where('type', 'in', ['contrato', 'padrão']), // Assumindo que preventivas são de 'contrato' ou 'padrão' gerado
+    where('type', '==', 'contrato'),
     orderBy('createdAt', 'desc'),
     limit(1)
   );
@@ -38,31 +38,29 @@ async function findLastPreventiveTicket(clientId: string, sectorId: string): Pro
  */
 export async function generatePreventiveTickets() {
   console.log('Iniciando verificação de manutenções preventivas...');
-  const clientsRef = collection(db, 'clients');
-  const q = query(clientsRef, where('status', '==', 'active'), where('preventiveContract', '!=', null));
+  const contractsRef = collection(db, 'serviceContracts');
+  const q = query(contractsRef, where('status', '==', 'active'));
 
-  const clientsSnapshot = await getDocs(q);
-  if (clientsSnapshot.empty) {
-    console.log('Nenhum cliente com contrato preventivo ativo encontrado.');
+  const contractsSnapshot = await getDocs(q);
+  if (contractsSnapshot.empty) {
+    console.log('Nenhum contrato de serviço ativo encontrado.');
     return;
   }
 
   const today = new Date();
   const createdTickets: string[] = [];
 
-  // Usando for...of para lidar corretamente com as Promises dentro do loop
-  for (const clientDoc of clientsSnapshot.docs) {
+  for (const contractDoc of contractsSnapshot.docs) {
+    const contract = { id: contractDoc.id, ...contractDoc.data() } as ServiceContract;
+    
+    const clientDoc = await getDoc(doc(db, "clients", contract.clientId));
+    if (!clientDoc.exists()) continue;
     const client = { id: clientDoc.id, ...clientDoc.data() } as Client;
-    const contract = client.preventiveContract;
-
-    if (!contract || contract.sectorIds.length === 0 || contract.frequencyDays <= 0) {
-      continue; // Pula se o contrato for inválido
-    }
 
     for (const sectorId of contract.sectorIds) {
       const lastTicket = await findLastPreventiveTicket(client.id, sectorId);
       
-      const lastVisitDate = lastTicket ? new Date(lastTicket.createdAt) : new Date(0); // Se não houver, usa uma data antiga para forçar a criação
+      const lastVisitDate = lastTicket ? parseISO(lastTicket.updatedAt) : new Date(0);
       const daysSinceLastVisit = differenceInDays(today, lastVisitDate);
 
       if (daysSinceLastVisit >= contract.frequencyDays) {
@@ -73,18 +71,17 @@ export async function generatePreventiveTickets() {
             id: client.id,
             name: client.name,
             phone: client.phone,
-            isWhats: false, // Default
-            address: `${client.address.street}, ${client.address.number}`,
+            isWhats: false, // Pode ser ajustado conforme necessário
+            address: client.address ? `${client.address.street}, ${client.address.number || 'S/N'}` : undefined,
           },
           requesterName: 'Sistema (Preventiva Automática)',
           sectorId: sectorId,
-          creatorId: 'system', // Identificador para o sistema
+          creatorId: 'system',
           description: `Manutenção preventiva programada conforme contrato (Frequência: ${contract.frequencyDays} dias).`,
-          type: 'contrato', // Classifica como tipo 'contrato'
+          type: 'contrato',
           status: 'pendente',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          comments: [],
         };
 
         try {
@@ -107,6 +104,6 @@ export async function generatePreventiveTickets() {
   return {
     message: 'Verificação de manutenção preventiva concluída.',
     createdTicketsCount: createdTickets.length,
-    checkedClientsCount: clientsSnapshot.size,
+    checkedContractsCount: contractsSnapshot.size,
   };
 }

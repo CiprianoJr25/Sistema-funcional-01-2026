@@ -16,17 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "../ui/checkbox";
 import { useEffect, useState } from "react";
-import { Separator } from "../ui/separator";
-import { Sector } from "@/lib/types";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/firebase/config";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown, ArrowLeft, ArrowRight } from "lucide-react";
-import { ScrollArea } from "../ui/scroll-area";
 import React from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "O nome é obrigatório." }),
@@ -54,14 +44,7 @@ interface NewClientFormProps {
   onFinished: () => void;
 }
 
-const steps = [
-    { step: 1, title: "Dados do Cliente" },
-    { step: 2, title: "Endereço" },
-    { step: 3, title: "Configurações" },
-];
-
 export function NewClientForm({ onSave, onFinished }: NewClientFormProps) {
-  const [currentStep, setCurrentStep] = useState(1);
   const [hasSla, setHasSla] = useState(false);
 
   const form = useForm<NewClientFormValues>({
@@ -85,28 +68,6 @@ export function NewClientForm({ onSave, onFinished }: NewClientFormProps) {
     },
   });
 
-  async function handleNextStep() {
-    let fieldsToValidate: (keyof NewClientFormValues)[] = [];
-    if (currentStep === 1) {
-        fieldsToValidate = ['name', 'phone'];
-    } else if (currentStep === 2) {
-        fieldsToValidate = ['address.street', 'address.neighborhood', 'address.city', 'address.state'];
-    }
-
-    const isValid = await form.trigger(fieldsToValidate as any);
-    if (isValid) {
-        if (currentStep < 3) {
-            setCurrentStep(currentStep + 1);
-        }
-    }
-  }
-
-  function handlePreviousStep() {
-    if (currentStep > 1) {
-        setCurrentStep(currentStep - 1);
-    }
-  }
-
   function onSubmit(values: NewClientFormValues) {
     onSave(values);
   }
@@ -114,42 +75,10 @@ export function NewClientForm({ onSave, onFinished }: NewClientFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="flex items-center justify-center space-x-2 md:space-x-4 mb-6 p-2 rounded-lg bg-muted">
-            {steps.map((item, index) => (
-                <React.Fragment key={item.step}>
-                    <div className="flex items-center">
-                        <div
-                            className={cn(
-                            "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold transition-all",
-                            currentStep > item.step ? "bg-primary text-primary-foreground" :
-                            currentStep === item.step ? "bg-primary text-primary-foreground scale-110" : "bg-muted-foreground/30 text-muted-foreground"
-                            )}
-                        >
-                           {currentStep > item.step ? <Check className="w-4 h-4" /> : item.step}
-                        </div>
-                        <div
-                            className={cn(
-                            "ml-2 text-sm hidden md:block",
-                            currentStep === item.step ? "font-semibold text-foreground" : "text-muted-foreground"
-                            )}
-                        >
-                            {item.title}
-                        </div>
-                    </div>
-                    {index < steps.length - 1 && (
-                         <div className={cn(
-                             "flex-1 h-1 rounded-full",
-                             currentStep > item.step ? "bg-primary" : "bg-muted-foreground/30"
-                             )} />
-                    )}
-                </React.Fragment>
-            ))}
-        </div>
-
-        <div className="min-h-[350px]">
-          {currentStep === 1 && (
-            <div className="space-y-4 animate-in fade-in-0 duration-300">
-              <FormField
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
+            {/* Dados do Cliente */}
+            <h3 className="text-lg font-medium border-b pb-2">Dados do Cliente</h3>
+             <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
@@ -216,161 +145,134 @@ export function NewClientForm({ onSave, onFinished }: NewClientFormProps) {
                     )}
                 />
               </div>
+
+            {/* Endereço */}
+            <h3 className="text-lg font-medium border-b pb-2 pt-4">Endereço</h3>
+            <FormField
+                control={form.control}
+                name="address.street"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Logradouro</FormLabel>
+                    <FormControl>
+                    <Input placeholder="Rua, Avenida..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+                <FormField
+                    control={form.control}
+                    name="address.number"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Número</FormLabel>
+                        <FormControl>
+                        <Input placeholder="123" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="address.complement"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Complemento</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Apto, Bloco..." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
             </div>
-          )}
-
-          {currentStep === 2 && (
-             <div className="space-y-4 animate-in fade-in-0 duration-300">
-                <h3 className="text-lg font-medium">Endereço</h3>
+            <FormField
+                control={form.control}
+                name="address.neighborhood"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Bairro</FormLabel>
+                    <FormControl>
+                    <Input placeholder="Centro" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+            <div className="grid grid-cols-[2fr_1fr] gap-4">
                 <FormField
                     control={form.control}
-                    name="address.street"
+                    name="address.city"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Logradouro</FormLabel>
+                        <FormLabel>Cidade</FormLabel>
                         <FormControl>
-                        <Input placeholder="Rua, Avenida..." {...field} />
+                        <Input placeholder="Sua cidade" {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
                     )}
                 />
-                <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                        control={form.control}
-                        name="address.number"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Número</FormLabel>
-                            <FormControl>
-                            <Input placeholder="123" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="address.complement"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Complemento</FormLabel>
-                            <FormControl>
-                            <Input placeholder="Apto, Bloco..." {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                </div>
                 <FormField
                     control={form.control}
-                    name="address.neighborhood"
+                    name="address.state"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Bairro</FormLabel>
+                        <FormLabel>UF</FormLabel>
                         <FormControl>
-                        <Input placeholder="Centro" {...field} />
+                        <Input placeholder="SP" {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
                     )}
                 />
-                <div className="grid grid-cols-[2fr_1fr] gap-4">
-                    <FormField
-                        control={form.control}
-                        name="address.city"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Cidade</FormLabel>
-                            <FormControl>
-                            <Input placeholder="Sua cidade" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="address.state"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>UF</FormLabel>
-                            <FormControl>
-                            <Input placeholder="SP" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                </div>
-             </div>
-          )}
+            </div>
 
-          {currentStep === 3 && (
-            <div className="space-y-4 animate-in fade-in-0 duration-300">
-                <h3 className="text-lg font-medium">SLA (Opcional)</h3>
-                <FormField
-                        control={form.control}
-                        name="hasSla"
-                        render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                            <Checkbox
-                                checked={field.value}
-                                onCheckedChange={(checked) => {
-                                    field.onChange(checked);
-                                    setHasSla(!!checked);
-                                }}
-                            />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                                Este cliente possui um Acordo de Nível de Serviço (SLA)?
-                            </FormLabel>
-                        </FormItem>
-                        )}
-                    />
-                    {hasSla && (
-                        <FormField
-                            control={form.control}
-                            name="slaHours"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Tempo de Atendimento (em horas)</FormLabel>
-                                <FormControl>
-                                <Input type="number" placeholder="Ex: 4" {...field} value={field.value ?? ""} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
+            {/* SLA */}
+            <h3 className="text-lg font-medium border-b pb-2 pt-4">SLA (Opcional)</h3>
+             <FormField
+                    control={form.control}
+                    name="hasSla"
+                    render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                        <Checkbox
+                            checked={field.value}
+                            onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                setHasSla(!!checked);
+                            }}
                         />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                            Este cliente possui um Acordo de Nível de Serviço (SLA)?
+                        </FormLabel>
+                    </FormItem>
                     )}
-            </div>
-          )}
+                />
+                {hasSla && (
+                    <FormField
+                        control={form.control}
+                        name="slaHours"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Tempo de Atendimento (em horas)</FormLabel>
+                            <FormControl>
+                            <Input type="number" placeholder="Ex: 4" {...field} value={field.value ?? ""} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                )}
         </div>
 
-        <div className="flex justify-between gap-2 pt-4 border-t">
-          <div>
-            {currentStep > 1 && (
-                <Button type="button" variant="outline" onClick={handlePreviousStep}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Anterior
-                </Button>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <Button type="button" variant="ghost" onClick={onFinished}>Cancelar</Button>
-            {currentStep < 3 && (
-                <Button type="button" onClick={handleNextStep}>
-                    Próximo
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-            )}
-            {currentStep === 3 && (
-                <Button type="submit">Salvar Cliente</Button>
-            )}
-          </div>
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button type="button" variant="ghost" onClick={onFinished}>Cancelar</Button>
+          <Button type="submit">Salvar Cliente</Button>
         </div>
       </form>
     </Form>
