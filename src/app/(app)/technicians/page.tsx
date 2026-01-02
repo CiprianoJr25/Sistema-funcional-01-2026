@@ -69,60 +69,48 @@ export default function TechniciansPage() {
   useEffect(() => {
     setLoading(true);
 
-    const unsubTechnicians = onSnapshot(collection(db, "technicians"), 
-        (techSnapshot) => {
-            const techsData = techSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
-            setRawTechnicians(techsData);
-        }, 
-        (error) => {
-            console.error("Error fetching technicians:", error);
-            setRawTechnicians([]);
-        }
-    );
+    const collectionsToFetch = [
+        { name: 'technicians', setter: setRawTechnicians },
+        { name: 'users', setter: setAllUsers },
+        { name: 'sectors', setter: setSectors },
+    ];
 
-    const unsubUsers = onSnapshot(collection(db, "users"), 
-        (userSnapshot) => {
-            const usersData = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-            setAllUsers(usersData);
-        }, 
-        (error) => {
-            console.error("Error fetching users:", error);
-            setAllUsers([]);
-        }
-    );
-    
-    const unsubSectors = onSnapshot(collection(db, "sectors"),
-        (snapshot) => {
-            setSectors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector)));
-        },
-        (error) => {
-            console.error("Error fetching sectors:", error);
-            setSectors([]);
-        }
-    );
+    let loadedCount = 0;
+    const totalCollections = collectionsToFetch.length;
+
+    const unsubscribes = collectionsToFetch.map(({ name, setter }) => {
+        const q = query(collection(db, name));
+        return onSnapshot(q, 
+            (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any;
+                setter(data);
+            },
+            (error) => {
+                console.warn(`A coleção '${name}' não foi encontrada ou ocorreu um erro. Tratando como vazia.`, error);
+                setter([]); 
+            }
+        );
+    });
 
     return () => {
-        unsubTechnicians();
-        unsubUsers();
-        unsubSectors();
+        unsubscribes.forEach(unsub => unsub());
     };
-  }, []);
+}, []);
 
   useEffect(() => {
-      if (rawTechnicians.length > 0 && allUsers.length > 0) {
+      // This effect now ONLY combines data and sets the final loading state
+      if (rawTechnicians.length > 0 && allUsers.length > 0 && sectors.length > 0) {
           const combined = combineTechniciansAndUsers(rawTechnicians, allUsers);
           const visible = filterVisibleTechnicians(combined, adminUser);
           setTechnicians(visible);
           setLoading(false);
-      } else if (!loading) {
-          // If there are no technicians or users, we should stop loading
+      } else if (!loading && (rawTechnicians.length === 0 || allUsers.length === 0)) {
+          // If we're not loading but some data is missing, it means there are no technicians/users to show.
+          // This prevents getting stuck on the loading screen.
           setTechnicians([]);
+          setLoading(false);
       }
-      // Set loading to false if one is loaded and the other is empty.
-      if ((rawTechnicians.length > 0 && allUsers.length === 0) || (rawTechnicians.length === 0 && allUsers.length > 0)) {
-        setLoading(false);
-      }
-  }, [rawTechnicians, allUsers, adminUser, combineTechniciansAndUsers, filterVisibleTechnicians, loading]);
+  }, [rawTechnicians, allUsers, sectors, adminUser, combineTechniciansAndUsers, filterVisibleTechnicians, loading]);
   
   const filteredTechnicians = useMemo(() => {
     if (sectorFilter === 'all') {
