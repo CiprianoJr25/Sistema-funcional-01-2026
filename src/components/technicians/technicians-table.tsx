@@ -248,9 +248,9 @@ const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onEditPermission
     <>
         <DropdownMenu>
         <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
+            <Button variant="ghost" className="h-8 w-8 p-0" data-no-double-click>
             <span className="sr-only">Abrir menu</span>
-            <MoreHorizontal className="h-4 w-4" />
+            <MoreHorizontal className="h-4 w-4" data-no-double-click />
             </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
@@ -412,7 +412,11 @@ export function TechniciansTable({ data, sectors, onDataChange, onSavePermission
     },
   })
 
-  const handleRowDoubleClick = (row: any) => {
+  const handleRowDoubleClick = (e: React.MouseEvent, row: any) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-no-double-click]')) {
+      return;
+    }
     setSelectedTechnician(row.original);
     setIsDetailsOpen(true);
   }
@@ -481,11 +485,11 @@ export function TechniciansTable({ data, sectors, onDataChange, onSavePermission
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  onDoubleClick={() => handleRowDoubleClick(row)}
+                  onDoubleClick={(e) => handleRowDoubleClick(e, row)}
                   className="cursor-pointer"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} onClick={(e) => { if (cell.column.id === 'actions') e.stopPropagation(); }}>
+                    <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -570,3 +574,5 @@ export function TechniciansTable({ data, sectors, onDataChange, onSavePermission
     </div>
   )
 }
+
+    
