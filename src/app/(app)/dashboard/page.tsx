@@ -26,9 +26,11 @@ export default function Dashboard() {
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [period, setPeriod] = useState("this-month");
+  const [loading, setLoading] = useState(true);
 
 
   useEffect(() => {
+    setLoading(true);
     const unsubscribes = [
       onSnapshot(collection(db, 'external-tickets'), snapshot => {
         setExternalTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
@@ -47,8 +49,11 @@ export default function Dashboard() {
       }, () => setUsers([])),
     ];
 
+    const timer = setTimeout(() => setLoading(false), 2000); // Failsafe to prevent infinite loading
+
     return () => {
         unsubscribes.forEach(unsub => unsub());
+        clearTimeout(timer);
     }
   }, []);
 
@@ -82,7 +87,7 @@ export default function Dashboard() {
   }, [period, externalTickets, internalTickets]);
 
 
-  if (!user) {
+  if (loading || !user) {
     return (
         <div className="flex h-full w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -282,5 +287,3 @@ export default function Dashboard() {
     </>
   )
 }
-
-    

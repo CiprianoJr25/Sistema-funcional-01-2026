@@ -18,14 +18,17 @@ export default function LocationPage() {
   const [allSectors, setAllSectors] = useState<Sector[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [sectorFilter, setSectorFilter] = useState('all');
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
+    setLoading(true);
     const ticketsQuery = query(collection(db, "external-tickets"), where("status", "in", ["em andamento", "concluído"]));
     
     const unsubscribes = [
         onSnapshot(ticketsQuery, snapshot => {
             setAllTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
+            setLoading(false); // Stop loading once tickets are fetched
         }),
         onSnapshot(collection(db, "technicians"), snapshot => {
             setAllTechnicians(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician)));
@@ -134,6 +137,14 @@ export default function LocationPage() {
     });
   }, [allTickets, allTechnicians, allUsers, user, sectorFilter]);
 
+  if (loading) {
+    return (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
+
   return (
     <>
       <PageHeader 
@@ -170,5 +181,3 @@ export default function LocationPage() {
     </>
   );
 }
-
-    

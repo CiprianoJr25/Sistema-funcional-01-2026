@@ -40,6 +40,7 @@ export default function ExternalTicketsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -73,6 +74,7 @@ export default function ExternalTicketsPage() {
   }, [isMobile]);
 
   useEffect(() => {
+    setLoading(true);
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
         const usersData = snapshot.docs.map(doc => {
             const userData = { id: doc.id, ...doc.data() } as User;
@@ -97,6 +99,7 @@ export default function ExternalTicketsPage() {
     const unsubTickets = onSnapshot(collection(db, "external-tickets"), (snapshot) => {
         setTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
         setPullDistance(0);
+        setLoading(false);
     });
 
     return () => {
@@ -482,6 +485,14 @@ export default function ExternalTicketsPage() {
   const hasActiveRoute = filteredTickets.some(t => t.technicianId === user?.id && t.enRoute);
 
 
+  if (loading) {
+    return (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
+
   return (
     <>
     <Dialog open={isNewTicketDialogOpen} onOpenChange={setIsNewTicketDialogOpen}>
@@ -605,5 +616,3 @@ export default function ExternalTicketsPage() {
     </>
   );
 }
-
-    
