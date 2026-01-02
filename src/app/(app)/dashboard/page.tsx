@@ -149,16 +149,26 @@ export default function Dashboard() {
             
             <PageHeader title="Visão por Setor" description="Métricas detalhadas para cada setor da empresa." />
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {sectors.map(sector => (
-                    <SectorStatsCard 
-                        key={sector.id}
-                        sector={sector}
-                        tickets={filteredData.externalTickets.filter(t => t.sectorId === sector.id)}
-                        technicians={technicians.filter(t => t.sectorIds && t.sectorIds.includes(sector.id))}
-                    />
-                ))}
-            </div>
+            {sectors.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {sectors.map(sector => (
+                        <SectorStatsCard 
+                            key={sector.id}
+                            sector={sector}
+                            tickets={filteredData.externalTickets.filter(t => t.sectorId === sector.id)}
+                            technicians={technicians.filter(t => t.sectorIds && t.sectorIds.includes(sector.id))}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="text-center text-muted-foreground">
+                            <p>Nenhum setor cadastrado para exibir estatísticas.</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                  <ActiveRoutesCard technicians={technicians} tickets={externalTickets} />
@@ -169,9 +179,15 @@ export default function Dashboard() {
       case "encarregado":
         if (!user.sectorIds || user.sectorIds.length === 0) {
             return (
-                <div className="flex items-center justify-center h-full">
-                    <p>Você não está associado a nenhum setor.</p>
-                </div>
+                <Card>
+                    <CardContent className="pt-6">
+                         <div className="text-center text-muted-foreground">
+                            <AlertCircle className="mx-auto h-8 w-8 mb-2" />
+                            <p className="font-semibold">Nenhum Setor Associado</p>
+                            <p className="text-sm">Você não está associado a nenhum setor. Peça para um administrador te vincular a um setor.</p>
+                        </div>
+                    </CardContent>
+                </Card>
             );
         }
         const mySectors = sectors.filter(s => user.sectorIds?.includes(s.id));
