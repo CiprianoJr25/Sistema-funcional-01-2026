@@ -16,7 +16,7 @@ import { NewTechnicianForm, NewTechnicianFormValues } from "@/components/technic
 import { TechniciansTable } from "@/components/technicians/technicians-table";
 import { Technician, Sector, User, ModulePermissions, UserStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { collection, getDocs, doc, setDoc, updateDoc, writeBatch } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, updateDoc, writeBatch, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { useAuth } from "@/hooks/use-auth";
@@ -35,76 +35,86 @@ export default function TechniciansPage() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!adminUser) return;
-      setLoading(true);
-      
-      try {
-        const [techSnapshot, sectorsSnapshot, usersSnapshot] = await Promise.all([
-          getDocs(collection(db, "technicians")),
-          getDocs(collection(db, "sectors")),
-          getDocs(collection(db, "users")),
-        ]);
-        
-        const sectorsData = sectorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector));
-        const allUsersData = usersSnapshot.docs.map(doc => {
-            const user = { id: doc.id, ...doc.data() } as User;
-             // Compatibility layer: ensure sectorIds exists
-            if ((user as any).sectorId && !user.sectorIds) {
-                user.sectorIds = [(user as any).sectorId];
-            } else if (!user.sectorIds) {
-                user.sectorIds = [];
-            }
-            return user;
-        });
-
-        setSectors(sectorsData);
-        setAllUsers(allUsersData);
-        
-        // Combine tech data with user data for a complete profile
-        const combinedTechnicians = techSnapshot.docs.map(doc => {
-            const techData = doc.data() as Omit<Technician, 'id'>;
-            const correspondingUser = allUsersData.find(u => u.id === doc.id);
-            return {
-                id: doc.id,
-                ...techData,
-                // Ensure fields from 'users' collection are the source of truth
-                sectorIds: correspondingUser?.sectorIds || [],
-                status: correspondingUser?.status || techData.status,
-                name: correspondingUser?.name || techData.name,
-                email: correspondingUser?.email || techData.email,
-                phone: correspondingUser?.phone || (techData as any).phone,
-                euroInfoId: techData.euroInfoId,
-                rondoInfoId: techData.rondoInfoId,
-            };
-        });
-
-        // Apply visibility filter based on user role
-        let visibleTechnicians = combinedTechnicians;
-        if (adminUser.role === 'encarregado') {
-          const userSectorIds = adminUser.sectorIds || [];
-          if (userSectorIds.length > 0) {
-            visibleTechnicians = combinedTechnicians.filter(tech => 
-              tech.sectorIds && tech.sectorIds.some(techSectorId => userSectorIds.includes(techSectorId))
-            );
-          } else {
-            visibleTechnicians = []; // Encarregado with no sectors sees no one
-          }
-        } else if (adminUser.role === 'tecnico') {
-          visibleTechnicians = []; // Technicians should not see this page's content
-        }
-        
-        setTechnicians(visibleTechnicians);
-
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast({ variant: 'destructive', title: "Erro ao buscar dados" });
-      } finally {
+    if (!adminUser) {
         setLoading(false);
-      }
+        return;
     };
-    fetchData();
-  }, [adminUser, toast]);
+    setLoading(true);
+
+    const unsubTechnicians = onSnapshot(collection(db, "technicians"), 
+        (snapshot) => {
+            const techsData = snapshot.docs.map(doc => doc.data() as Omit<Technician, 'id'> & { id: string });
+            updateTechnicians(techsData, allUsers);
+        }, 
+        (error) => {
+            console.error("Error fetching technicians:", error);
+            setTechnicians([]);
+        }
+    );
+
+    const unsubUsers = onSnapshot(collection(db, "users"), 
+        (snapshot) => {
+            const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+            setAllUsers(usersData);
+            // Re-run technician update logic when users change
+            getDocs(collection(db, "technicians")).then(techSnapshot => {
+                const techsData = techSnapshot.docs.map(doc => doc.data() as Omit<Technician, 'id'> & { id: string });
+                updateTechnicians(techsData, usersData);
+            });
+        }, 
+        (error) => {
+            console.error("Error fetching users:", error);
+            setAllUsers([]);
+        }
+    );
+    
+    const unsubSectors = onSnapshot(collection(db, "sectors"),
+        (snapshot) => setSectors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector))),
+        (error) => {
+            console.error("Error fetching sectors:", error);
+            setSectors([]);
+        }
+    );
+
+    // Initial load might be fast, but give it a moment to avoid flashing loaders
+    const timer = setTimeout(() => setLoading(false), 1000);
+
+    return () => {
+        unsubTechnicians();
+        unsubUsers();
+        unsubSectors();
+        clearTimeout(timer);
+    };
+}, [adminUser]);
+
+const updateTechnicians = (techsData: (Omit<Technician, 'id'> & { id: string })[], usersData: User[]) => {
+    if (!adminUser) return;
+
+    const combinedTechnicians = techsData.map(techData => {
+        const correspondingUser = usersData.find(u => u.id === techData.id);
+        return {
+            ...techData,
+            sectorIds: correspondingUser?.sectorIds || [],
+            status: correspondingUser?.status || techData.status,
+            name: correspondingUser?.name || techData.name,
+            email: correspondingUser?.email || techData.email,
+            phone: correspondingUser?.phone,
+        };
+    });
+
+    let visibleTechnicians = combinedTechnicians;
+    if (adminUser.role === 'encarregado') {
+        const userSectorIds = adminUser.sectorIds || [];
+        visibleTechnicians = userSectorIds.length > 0 
+            ? combinedTechnicians.filter(tech => tech.sectorIds.some(techSectorId => userSectorIds.includes(techSectorId)))
+            : [];
+    } else if (adminUser.role === 'tecnico') {
+        visibleTechnicians = [];
+    }
+    
+    setTechnicians(visibleTechnicians);
+};
+
   
   const filteredTechnicians = useMemo(() => {
     if (sectorFilter === 'all') {
@@ -150,21 +160,9 @@ export default function TechniciansPage() {
         euroInfoId: values.euroInfoId,
         rondoInfoId: values.rondoInfoId,
       };
+      // The ID for the technician document is the same as the user ID
       await setDoc(doc(db, "technicians", newUserId), newTechnician);
       
-      let shouldAddToState = false;
-      if (adminUser.role === 'admin' || adminUser.role === 'gerente') {
-        shouldAddToState = true;
-      } else if (adminUser.role === 'encarregado') {
-        if (adminUser.sectorIds?.includes(values.sectorId)) {
-           shouldAddToState = true;
-        }
-      }
-      
-      if (shouldAddToState) {
-        setTechnicians(prev => [{ ...newUser, ...newTechnician, phone: values.phone } as Technician, ...prev]);
-      }
-
       setIsDialogOpen(false);
       toast({
         title: "Técnico Criado com Sucesso!",
@@ -208,7 +206,6 @@ export default function TechniciansPage() {
 
     try {
         await batch.commit();
-        setTechnicians(prev => prev.map(t => t.id === technicianId ? { ...t, ...values } : t));
         toast({ title: "Técnico atualizado com sucesso!" });
         return true;
     } catch (error) {
@@ -242,7 +239,6 @@ export default function TechniciansPage() {
 
     try {
         await batch.commit();
-        setTechnicians(prev => prev.map(t => t.id === technician.id ? { ...t, status: newStatus } : t));
         toast({
             title: "Status do Técnico Atualizado!",
             description: `O técnico ${technician.name} foi ${newStatus === 'active' ? 'reativado' : 'desativado'}.`,

@@ -35,24 +35,30 @@ export default function Dashboard() {
     const unsubscribes = [
       onSnapshot(collection(db, 'external-tickets'), snapshot => {
         setExternalTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
-      }),
+      }, () => setExternalTickets([])),
       onSnapshot(collection(db, 'internal-tickets'), snapshot => {
         setInternalTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InternalTicket)));
-      }),
+      }, () => setInternalTickets([])),
       onSnapshot(collection(db, 'technicians'), snapshot => {
         setTechnicians(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician)));
-      }),
+      }, () => setTechnicians([])),
       onSnapshot(collection(db, 'sectors'), snapshot => {
         setSectors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector)));
-      }),
+      }, () => setSectors([])),
       onSnapshot(collection(db, 'users'), snapshot => {
         setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
-      }),
+      }, () => setUsers([])),
     ];
+    
+    // Allow a moment for Firestore to connect and return initial data
+    const timer = setTimeout(() => {
+        setLoading(false);
+    }, 1500);
 
-    setLoading(false); // Assume data will stream in, so we can stop global loading.
-
-    return () => unsubscribes.forEach(unsub => unsub());
+    return () => {
+        unsubscribes.forEach(unsub => unsub());
+        clearTimeout(timer);
+    }
   }, []);
 
   const filteredData = useMemo(() => {
@@ -285,5 +291,3 @@ export default function Dashboard() {
     </>
   )
 }
-
-    

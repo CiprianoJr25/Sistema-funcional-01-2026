@@ -73,56 +73,44 @@ export default function ExternalTicketsPage() {
     }
   }, [isMobile]);
 
-  const fetchData = useCallback(async () => {
+  useEffect(() => {
     setLoading(true);
-    try {
-      const [usersSnapshot, sectorsSnapshot, techsSnapshot] = await Promise.all([
-        getDocs(collection(db, "users")),
-        getDocs(collection(db, "sectors")),
-        getDocs(collection(db, "technicians")),
-      ]);
-      
-      const usersData = usersSnapshot.docs.map(doc => {
-          const userData = { id: doc.id, ...doc.data() } as User;
-           if ((userData as any).sectorId && !userData.sectorIds) {
-              userData.sectorIds = [(userData as any).sectorId];
-          } else if (!userData.sectorIds) {
-              userData.sectorIds = [];
-          }
-          return userData;
-      });
-      const sectorsData = sectorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector));
-      const techsData = techsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
-      
-      setUsers(usersData);
-      setSectors(sectorsData);
-      setTechnicians(techsData);
 
-      const unsubscribeTickets = onSnapshot(collection(db, "external-tickets"), (snapshot) => {
-        const ticketsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket));
-        setTickets(ticketsData);
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+        const usersData = snapshot.docs.map(doc => {
+            const userData = { id: doc.id, ...doc.data() } as User;
+             if ((userData as any).sectorId && !userData.sectorIds) {
+                userData.sectorIds = [(userData as any).sectorId];
+            } else if (!userData.sectorIds) {
+                userData.sectorIds = [];
+            }
+            return userData;
+        });
+        setUsers(usersData);
+    });
+    
+    const unsubSectors = onSnapshot(collection(db, "sectors"), (snapshot) => {
+        setSectors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector)));
+    });
+    
+    const unsubTechs = onSnapshot(collection(db, "technicians"), (snapshot) => {
+        setTechnicians(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician)));
+    });
+
+    const unsubTickets = onSnapshot(collection(db, "external-tickets"), (snapshot) => {
+        setTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
         setLoading(false);
         setPullDistance(0);
-      });
+    });
 
-      return () => unsubscribeTickets();
-
-    } catch (error) {
-      console.error("Error fetching tickets page data:", error);
-      toast({ variant: 'destructive', title: "Erro ao buscar dados" });
-      setLoading(false);
-    }
-  }, [toast]);
-
-
-  useEffect(() => {
-    const unsubscribePromise = fetchData();
     return () => {
-        unsubscribePromise.then(unsub => {
-            if (unsub) unsub();
-        });
-    }
-  }, [fetchData]);
+        unsubUsers();
+        unsubSectors();
+        unsubTechs();
+        unsubTickets();
+    };
+}, []);
+
   
   // Persist status filter to session storage
   useEffect(() => {
@@ -495,7 +483,7 @@ export default function ExternalTicketsPage() {
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
   
-  if (loading && tickets.length === 0) {
+  if (loading) {
     return (
         <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin" />
