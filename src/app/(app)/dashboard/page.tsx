@@ -31,31 +31,49 @@ export default function Dashboard() {
 
   useEffect(() => {
     setLoading(true);
-    const unsubscribes = [
-      onSnapshot(collection(db, 'external-tickets'), snapshot => {
-        setExternalTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
-      }, () => setExternalTickets([])),
-      onSnapshot(collection(db, 'internal-tickets'), snapshot => {
-        setInternalTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InternalTicket)));
-      }, () => setInternalTickets([])),
-      onSnapshot(collection(db, 'technicians'), snapshot => {
-        setTechnicians(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician)));
-      }, () => setTechnicians([])),
-      onSnapshot(collection(db, 'sectors'), snapshot => {
-        setSectors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector)));
-      }, () => setSectors([])),
-      onSnapshot(collection(db, 'users'), snapshot => {
-        setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
-      }, () => setUsers([])),
+    
+    const collectionsToFetch = [
+      { name: 'external-tickets', setter: setExternalTickets },
+      { name: 'internal-tickets', setter: setInternalTickets },
+      { name: 'technicians', setter: setTechnicians },
+      { name: 'sectors', setter: setSectors },
+      { name: 'users', setter: setUsers },
     ];
 
-    // Failsafe to prevent infinite loading if collections don't exist
-    const timer = setTimeout(() => setLoading(false), 3000); 
+    let loadedCount = 0;
+
+    const unsubscribes = collectionsToFetch.map(({ name, setter }) => {
+      return onSnapshot(collection(db, name), 
+        (snapshot) => {
+          setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
+          loadedCount++;
+          if (loadedCount === collectionsToFetch.length) {
+            setLoading(false);
+          }
+        },
+        (error) => {
+          console.error(`Error fetching ${name}:`, error);
+          setter([]); // Set to empty array on error
+          loadedCount++;
+          if (loadedCount === collectionsToFetch.length) {
+            setLoading(false);
+          }
+        }
+      );
+    });
+
+    // Safety timeout in case some collection listener fails silently
+    const timer = setTimeout(() => {
+        if (loading) {
+            setLoading(false);
+        }
+    }, 5000);
 
     return () => {
         unsubscribes.forEach(unsub => unsub());
         clearTimeout(timer);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredData = useMemo(() => {
