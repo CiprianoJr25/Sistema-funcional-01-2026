@@ -7,23 +7,58 @@ import { Logo } from "@/components/logo";
 import { NavLinks } from "@/components/nav-links";
 import { UserNav } from "@/components/user-nav";
 import { useAuth } from "@/hooks/use-auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarSeparator, SidebarTrigger, SidebarInset, SidebarProvider, useOptionalSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import type { User } from '@/lib/types';
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-    const { user, loading } = useAuth();
+    const { user: realUser, loading } = useAuth();
     const router = useRouter();
     const sidebar = useOptionalSidebar();
+    const searchParams = useSearchParams();
+
+    // --- Sua Ideia Implementada ---
+    const isMockMode = searchParams.get('mock') === 'true';
+    const mockUser: User = {
+        id: 'mock-admin-id',
+        name: 'Usuário Mock (Admin)',
+        email: 'mock@sistema.com',
+        role: 'admin',
+        status: 'active',
+        sectorIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        permissions: {
+            dashboard: 'write',
+            external_tickets: 'write',
+            internal_tickets: 'write',
+            routes: 'write',
+            planning: 'write',
+            reports: 'write',
+            history: 'write',
+            clients: 'write',
+            technicians: 'write',
+            location: 'write',
+            monitoring: 'write',
+        }
+    };
+    
+    const user = isMockMode ? mockUser : realUser;
+    // ---------------------------------
    
     useEffect(() => {
+      // O modo mock ignora a verificação de redirecionamento
+      if (isMockMode) return;
+
       if (!loading && !user) {
         router.replace('/login');
       }
-    }, [user, loading, router]);
+    }, [user, loading, router, isMockMode]);
     
-    if (loading || !user) {
+    // Em modo mock, não mostramos a tela de carregamento, vamos direto ao ponto.
+    if (!isMockMode && (loading || !user)) {
       return (
         <div className="flex h-screen w-full items-center justify-center bg-background">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -31,6 +66,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       );
     }
   
+    // Se o usuário é nulo, mas estamos em mock mode, isso não deve acontecer, mas é uma segurança.
+    if (!user) {
+        return (
+             <div className="flex h-screen w-full items-center justify-center bg-background">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+             </div>
+        );
+    }
+
     return (
       <SidebarProvider>
         <Sidebar collapsible="icon" className='border-r'>
