@@ -221,13 +221,11 @@ const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onEditPermission
   const [actionType, setActionType] = React.useState<'activate' | 'deactivate' | null>(null);
 
   const handleActionClick = (e: React.MouseEvent, type: 'activate' | 'deactivate') => {
-    e.stopPropagation();
     setActionType(type);
     setIsAlertOpen(true);
   }
   
   const handleConfirmAction = (e: React.MouseEvent) => {
-    e.stopPropagation();
     if (actionType) {
       onStatusChange(technician, actionType === 'activate' ? 'active' : 'inactive');
     }
@@ -235,30 +233,29 @@ const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onEditPermission
   }
 
   const handleEditClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
     onEdit(technician);
   }
 
   const handlePermissionsClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
     onEditPermissions(technician);
   }
 
   return (
     <>
+      <div onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0" data-no-double-click>
-            <span className="sr-only">Abrir menu</span>
-            <MoreHorizontal className="h-4 w-4" data-no-double-click />
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Abrir menu</span>
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
             <DropdownMenuLabel>Ações</DropdownMenuLabel>
             <DropdownMenuItem
-            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(technician.id); }}
+              onClick={() => { navigator.clipboard.writeText(technician.id); }}
             >
-            Copiar ID
+              Copiar ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleEditClick}>
@@ -276,20 +273,21 @@ const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onEditPermission
                     Reativar
                 </DropdownMenuItem>
             )}
-        </DropdownMenuContent>
+          </DropdownMenuContent>
         </DropdownMenu>
-         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                <AlertDialogDescription>
-                Você deseja {actionType === 'activate' ? 'reativar' : 'desativar'} o técnico {technician.name}?
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmAction}>Confirmar</AlertDialogAction>
-            </AlertDialogFooter>
+      </div>
+       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                  Você deseja {actionType === 'activate' ? 'reativar' : 'desativar'} o técnico {technician.name}?
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirmAction}>Confirmar</AlertDialogAction>
+              </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
     </>
@@ -412,11 +410,7 @@ export function TechniciansTable({ data, sectors, onDataChange, onSavePermission
     },
   })
 
-  const handleRowDoubleClick = (e: React.MouseEvent, row: any) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('[data-no-double-click]')) {
-      return;
-    }
+  const handleRowDoubleClick = (row: any) => {
     setSelectedTechnician(row.original);
     setIsDetailsOpen(true);
   }
@@ -485,7 +479,7 @@ export function TechniciansTable({ data, sectors, onDataChange, onSavePermission
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  onDoubleClick={(e) => handleRowDoubleClick(e, row)}
+                  onDoubleClick={() => handleRowDoubleClick(row)}
                   className="cursor-pointer"
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -574,5 +568,3 @@ export function TechniciansTable({ data, sectors, onDataChange, onSavePermission
     </div>
   )
 }
-
-    

@@ -52,13 +52,11 @@ const ActionsCell = ({ row, onStatusChange, onEdit }: { row: any, onStatusChange
   const [actionType, setActionType] = React.useState<ActionType | null>(null);
 
   const handleActionClick = (e: React.MouseEvent, type: ActionType) => {
-    e.stopPropagation();
     setActionType(type);
     setIsAlertOpen(true);
   }
 
   const handleConfirmAction = (e: React.MouseEvent) => {
-    e.stopPropagation();
     if (actionType) {
       onStatusChange(client, actionType === 'activate' ? 'active' : 'inactive');
     }
@@ -66,41 +64,42 @@ const ActionsCell = ({ row, onStatusChange, onEdit }: { row: any, onStatusChange
   }
   
   const handleEditClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
     onEdit(client);
   }
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0" data-no-double-click>
-            <span className="sr-only">Abrir menu</span>
-            <MoreHorizontal className="h-4 w-4" data-no-double-click />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenuLabel>Ações</DropdownMenuLabel>
-          <DropdownMenuItem
-            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(client.id); }}
-          >
-            Copiar ID
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleEditClick}>Editar</DropdownMenuItem>
-          {client.status === 'active' ? (
-              <DropdownMenuItem onClick={(e) => handleActionClick(e, 'deactivate')} className="text-destructive focus:text-destructive">
-                  Desativar
-              </DropdownMenuItem>
-          ) : (
-              <DropdownMenuItem onClick={(e) => handleActionClick(e, 'activate')}>
-                  Reativar
-              </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Abrir menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+            <DropdownMenuItem
+              onClick={() => { navigator.clipboard.writeText(client.id); }}
+            >
+              Copiar ID
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleEditClick}>Editar</DropdownMenuItem>
+            {client.status === 'active' ? (
+                <DropdownMenuItem onClick={(e) => handleActionClick(e, 'deactivate')} className="text-destructive focus:text-destructive">
+                    Desativar
+                </DropdownMenuItem>
+            ) : (
+                <DropdownMenuItem onClick={(e) => handleActionClick(e, 'activate')}>
+                    Reativar
+                </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
        <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -108,7 +107,7 @@ const ActionsCell = ({ row, onStatusChange, onEdit }: { row: any, onStatusChange
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmAction}>Confirmar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -213,11 +212,7 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
     },
   })
 
-  const handleRowDoubleClick = (e: React.MouseEvent, row: any) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('[data-no-double-click]')) {
-      return;
-    }
+  const handleRowDoubleClick = (row: any) => {
     setSelectedClient(row.original);
     setIsDetailsOpen(true);
   }
@@ -274,7 +269,7 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  onDoubleClick={(e) => handleRowDoubleClick(e, row)}
+                  onDoubleClick={() => handleRowDoubleClick(row)}
                   className="cursor-pointer"
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -389,5 +384,3 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
     </div>
   )
 }
-
-    

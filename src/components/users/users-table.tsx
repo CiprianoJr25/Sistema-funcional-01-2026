@@ -242,13 +242,11 @@ const ActionsCell = ({ row, currentUser, onEdit, onEditPermissions, onStatusChan
   const canManage = !isGerenteManagingGerente && !isAdminManagingAdmin && !isSelf;
   
   const handleActionClick = (e: React.MouseEvent, type: 'activate' | 'deactivate') => {
-    e.stopPropagation();
     setActionType(type);
     setIsAlertOpen(true);
   }
   
   const handleConfirmAction = (e: React.MouseEvent) => {
-    e.stopPropagation();
     if (actionType) {
       onStatusChange(user, actionType === 'activate' ? 'active' : 'inactive');
     }
@@ -256,60 +254,60 @@ const ActionsCell = ({ row, currentUser, onEdit, onEditPermissions, onStatusChan
   }
 
   const handleEditClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
     onEdit(user);
   }
 
   const handlePermissionsClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
     onEditPermissions(user);
   }
 
   return (
     <>
+      <div onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0" data-no-double-click>
-            <span className="sr-only">Abrir menu</span>
-            <MoreHorizontal className="h-4 w-4" data-no-double-click />
-            </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(user.id); }}>
-              Copiar ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleEditClick} disabled={!canManage}>
-                Editar Usuário
-            </DropdownMenuItem>
-             <DropdownMenuItem onClick={handlePermissionsClick} disabled={!canManage}>
-                Editar Permissões
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {user.status === 'active' ? (
-                <DropdownMenuItem onClick={(e) => handleActionClick(e, 'deactivate')} disabled={!canManage} className="text-destructive focus:text-destructive">
-                    Desativar
-                </DropdownMenuItem>
-            ) : (
-                <DropdownMenuItem onClick={(e) => handleActionClick(e, 'activate')} disabled={!canManage}>
-                    Reativar
-                </DropdownMenuItem>
-            )}
-        </DropdownMenuContent>
+          <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Abrir menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Ações</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(user.id)}>
+                Copiar ID
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleEditClick} disabled={!canManage}>
+                  Editar Usuário
+              </DropdownMenuItem>
+               <DropdownMenuItem onClick={handlePermissionsClick} disabled={!canManage}>
+                  Editar Permissões
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {user.status === 'active' ? (
+                  <DropdownMenuItem onClick={(e) => handleActionClick(e, 'deactivate')} disabled={!canManage} className="text-destructive focus:text-destructive">
+                      Desativar
+                  </DropdownMenuItem>
+              ) : (
+                  <DropdownMenuItem onClick={(e) => handleActionClick(e, 'activate')} disabled={!canManage}>
+                      Reativar
+                  </DropdownMenuItem>
+              )}
+          </DropdownMenuContent>
         </DropdownMenu>
-         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                <AlertDialogDescription>
-                Você deseja {actionType === 'activate' ? 'reativar' : 'desativar'} o usuário {user.name}?
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmAction}>Confirmar</AlertDialogAction>
-            </AlertDialogFooter>
+      </div>
+       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                  Você deseja {actionType === 'activate' ? 'reativar' : 'desativar'} o usuário {user.name}?
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirmAction}>Confirmar</AlertDialogAction>
+              </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
     </>
@@ -427,11 +425,7 @@ export function UsersTable({ data, sectors, onDataChange, onSaveUser, onSavePerm
     },
   })
 
-  const handleRowDoubleClick = (e: React.MouseEvent, row: any) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('[data-no-double-click]')) {
-      return;
-    }
+  const handleRowDoubleClick = (row: any) => {
     setSelectedUser(row.original);
     setIsDetailsOpen(true);
   }
@@ -500,7 +494,7 @@ export function UsersTable({ data, sectors, onDataChange, onSaveUser, onSavePerm
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  onDoubleClick={(e) => handleRowDoubleClick(e, row)}
+                  onDoubleClick={() => handleRowDoubleClick(row)}
                   className="cursor-pointer"
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -589,5 +583,3 @@ export function UsersTable({ data, sectors, onDataChange, onSaveUser, onSavePerm
     </div>
   )
 }
-
-    
