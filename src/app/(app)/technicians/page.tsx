@@ -38,20 +38,19 @@ export default function TechniciansPage() {
     if (!adminUser) {
         setLoading(false);
         return;
-    };
+    }
     setLoading(true);
 
     const unsubTechnicians = onSnapshot(collection(db, "technicians"), 
         (techSnapshot) => {
             const techsData = techSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
-            // When technicians change, re-combine with the current user list
-            updateTechnicians(techsData, allUsers);
-            setLoading(false);
+             // When technicians change, re-combine with the current user list
+            const combined = combineTechniciansAndUsers(techsData, allUsers);
+            setTechnicians(filterVisibleTechnicians(combined, adminUser));
         }, 
         (error) => {
             console.error("Error fetching technicians:", error);
             setTechnicians([]);
-            setLoading(false);
         }
     );
 
@@ -59,28 +58,22 @@ export default function TechniciansPage() {
         (userSnapshot) => {
             const usersData = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
             setAllUsers(usersData);
-            // When users change, re-fetch technicians to ensure data is consistent
-            getDocs(collection(db, "technicians")).then(techSnapshot => {
-                const techsData = techSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
-                updateTechnicians(techsData, usersData);
-            }).finally(() => setLoading(false));
+            // This part is removed to avoid re-fetching and creating loops.
+            // The combination logic will now be handled more gracefully.
         }, 
         (error) => {
             console.error("Error fetching users:", error);
             setAllUsers([]);
-            setLoading(false);
         }
     );
     
     const unsubSectors = onSnapshot(collection(db, "sectors"),
         (snapshot) => {
             setSectors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector)));
-            setLoading(false);
         },
         (error) => {
             console.error("Error fetching sectors:", error);
             setSectors([]);
-            setLoading(false);
         }
     );
 
@@ -92,40 +85,50 @@ export default function TechniciansPage() {
         unsubSectors();
         clearTimeout(timer);
     };
-}, [adminUser, allUsers]);
+}, [adminUser]);
+
+// This effect will now handle combining data whenever `allUsers` or the raw `technicians` list changes.
+useEffect(() => {
+    // Re-fetch technicians snapshot to combine with new user data
+    getDocs(collection(db, "technicians")).then(techSnapshot => {
+        const techsData = techSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
+        const combined = combineTechniciansAndUsers(techsData, allUsers);
+        setTechnicians(filterVisibleTechnicians(combined, adminUser));
+        setLoading(false); // Ensure loading is off after combining
+    }).catch(() => setLoading(false));
+}, [allUsers, adminUser]);
 
 
-const updateTechnicians = (techsData: Technician[], usersData: User[]) => {
-    if (!adminUser || usersData.length === 0) return;
-
-    const combinedTechnicians = techsData.map(techData => {
-        const correspondingUser = usersData.find(u => u.id === techData.id);
+const combineTechniciansAndUsers = (techsData: Technician[], usersData: User[]): Technician[] => {
+    if (!adminUser) return [];
+    
+    return techsData.map(techData => {
+        const correspondingUser = usersData.find(u => u.id === techData.userId);
         if (!correspondingUser) {
-            // This can happen if a technician doc exists but the user doc was deleted.
-            // We'll skip this entry to avoid errors.
-            return null;
+            return null; // This technician's user doc might not exist yet or was deleted
         }
         return {
-            ...techData,
-            ...correspondingUser, // This will correctly overwrite name, email, status, etc.
-            id: techData.id, // Ensure technician ID is preserved
+            ...correspondingUser, // User data comes first
+            ...techData,        // Technician data overwrites, preserving specific technician fields
+            id: techData.id,    // Ensure technician ID (which is the same as userId) is correct
         };
     }).filter(Boolean) as Technician[]; // Filter out nulls
-
-
-    let visibleTechnicians = combinedTechnicians;
-    if (adminUser.role === 'encarregado') {
-        const userSectorIds = adminUser.sectorIds || [];
-        visibleTechnicians = userSectorIds.length > 0 
-            ? combinedTechnicians.filter(tech => tech.sectorIds && tech.sectorIds.some(techSectorId => userSectorIds.includes(techSectorId)))
-            : [];
-    } else if (adminUser.role === 'tecnico') {
-        visibleTechnicians = [];
-    }
-    
-    setTechnicians(visibleTechnicians);
 };
 
+const filterVisibleTechnicians = (techs: Technician[], currentUser: User | null): Technician[] => {
+    if (!currentUser) return [];
+
+    if (currentUser.role === 'admin' || currentUser.role === 'gerente') {
+        return techs;
+    }
+    if (currentUser.role === 'encarregado') {
+        const userSectorIds = currentUser.sectorIds || [];
+        return userSectorIds.length > 0 
+            ? techs.filter(tech => tech.sectorIds && tech.sectorIds.some(techSectorId => userSectorIds.includes(techSectorId)))
+            : [];
+    }
+    return []; // Technicians cannot see this page.
+};
   
   const filteredTechnicians = useMemo(() => {
     if (sectorFilter === 'all') {
