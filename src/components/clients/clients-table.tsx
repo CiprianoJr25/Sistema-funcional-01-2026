@@ -46,7 +46,7 @@ import { EditClientForm, EditClientFormValues } from "./edit-client-form"
 
 type ActionType = 'activate' | 'deactivate';
 
-const ActionsCell = ({ row, onStatusChange, onEdit }: { row: any, onStatusChange: (client: Client, status: 'active' | 'inactive') => void, onEdit: (client: Client) => void }) => {
+const ActionsCell = ({ row, onStatusChange, onEdit, onViewDetails }: { row: any, onStatusChange: (client: Client, status: 'active' | 'inactive') => void, onEdit: (client: Client) => void, onViewDetails: (client: Client) => void }) => {
   const client = row.original as Client
   const [isAlertOpen, setIsAlertOpen] = React.useState(false);
   const [actionType, setActionType] = React.useState<ActionType | null>(null);
@@ -79,6 +79,7 @@ const ActionsCell = ({ row, onStatusChange, onEdit }: { row: any, onStatusChange
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Ações</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => onViewDetails(client)}>Ver Detalhes</DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => { navigator.clipboard.writeText(client.id); }}
             >
@@ -141,6 +142,11 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
     setSelectedClient(client);
     setIsEditOpen(true);
   };
+  
+  const handleViewDetails = (client: Client) => {
+    setSelectedClient(client);
+    setIsDetailsOpen(true);
+  }
 
   const handleSaveEdit = async (clientId: string, values: EditClientFormValues) => {
       const success = await onUpdateClient(clientId, values);
@@ -182,7 +188,7 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
       {
         id: "actions",
         enableHiding: false,
-        cell: ({ row }) => <ActionsCell row={row} onStatusChange={onStatusChange} onEdit={handleEdit} />,
+        cell: ({ row }) => <ActionsCell row={row} onStatusChange={onStatusChange} onEdit={handleEdit} onViewDetails={handleViewDetails} />,
       },
     ];
     return columns;
@@ -213,8 +219,7 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
   })
 
   const handleRowDoubleClick = (row: any) => {
-    setSelectedClient(row.original);
-    setIsDetailsOpen(true);
+    handleEdit(row.original);
   }
 
   React.useEffect(() => {

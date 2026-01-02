@@ -77,11 +77,11 @@ const moduleLabels: Record<keyof ModulePermissions, string> = {
     internal_tickets: "Atendimentos Internos",
     routes: "Otimizar Rotas",
     planning: "Planejamento",
-    location: "Localização",
     reports: "Relatórios",
     history: "Histórico",
     clients: "Clientes",
     technicians: "Técnicos",
+    location: "Localização",
     monitoring: "Monitoramento",
 };
 
@@ -213,9 +213,10 @@ interface ActionsCellProps {
   onEdit: (technician: Technician) => void;
   onEditPermissions: (technician: Technician) => void;
   onStatusChange: (technician: Technician, status: UserStatus) => void;
+  onViewDetails: (technician: Technician) => void;
 }
 
-const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onEditPermissions, onStatusChange }) => {
+const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onEditPermissions, onStatusChange, onViewDetails }) => {
   const technician = row.original as Technician;
   const [isAlertOpen, setIsAlertOpen] = React.useState(false);
   const [actionType, setActionType] = React.useState<'activate' | 'deactivate' | null>(null);
@@ -252,6 +253,9 @@ const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onEditPermission
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Ações</DropdownMenuLabel>
+             <DropdownMenuItem onClick={() => onViewDetails(technician)}>
+              Ver Detalhes
+            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => { navigator.clipboard.writeText(technician.id); }}
             >
@@ -387,7 +391,7 @@ export function TechniciansTable({ data, sectors, onDataChange, onSavePermission
     {
       id: "actions",
       enableHiding: false,
-      cell: (props) => <ActionsCell {...props} onEdit={handleEdit} onEditPermissions={handleEditPermissions} onStatusChange={onStatusChange} />,
+      cell: (props) => <ActionsCell {...props} onEdit={handleEdit} onEditPermissions={handleEditPermissions} onStatusChange={onStatusChange} onViewDetails={handleViewDetails} />,
     },
   ]
 
@@ -410,9 +414,13 @@ export function TechniciansTable({ data, sectors, onDataChange, onSavePermission
     },
   })
 
-  const handleRowDoubleClick = (row: any) => {
-    setSelectedTechnician(row.original);
+  const handleViewDetails = (technician: Technician) => {
+    setSelectedTechnician(technician);
     setIsDetailsOpen(true);
+  }
+
+  const handleRowDoubleClick = (row: any) => {
+    handleEditPermissions(row.original);
   }
 
   React.useEffect(() => {
