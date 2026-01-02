@@ -49,7 +49,8 @@ export default function Dashboard() {
       }, () => setUsers([])),
     ];
 
-    const timer = setTimeout(() => setLoading(false), 2000); // Failsafe to prevent infinite loading
+    // Failsafe to prevent infinite loading if collections don't exist
+    const timer = setTimeout(() => setLoading(false), 3000); 
 
     return () => {
         unsubscribes.forEach(unsub => unsub());
@@ -287,3 +288,5 @@ export default function Dashboard() {
     </>
   )
 }
+
+    

@@ -86,27 +86,30 @@ export default function ExternalTicketsPage() {
             return userData;
         });
         setUsers(usersData);
-    });
+    }, () => setUsers([]));
     
     const unsubSectors = onSnapshot(collection(db, "sectors"), (snapshot) => {
         setSectors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector)));
-    });
+    }, () => setSectors([]));
     
     const unsubTechs = onSnapshot(collection(db, "technicians"), (snapshot) => {
         setTechnicians(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician)));
-    });
+    }, () => setTechnicians([]));
 
     const unsubTickets = onSnapshot(collection(db, "external-tickets"), (snapshot) => {
         setTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
         setPullDistance(0);
-        setLoading(false);
-    });
+    }, () => setTickets([]));
+
+    // Failsafe to turn off loading
+    const timer = setTimeout(() => setLoading(false), 3000);
 
     return () => {
         unsubUsers();
         unsubSectors();
         unsubTechs();
         unsubTickets();
+        clearTimeout(timer);
     };
 }, []);
 
@@ -616,3 +619,5 @@ export default function ExternalTicketsPage() {
     </>
   );
 }
+
+    

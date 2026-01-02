@@ -28,20 +28,25 @@ export default function LocationPage() {
     const unsubscribes = [
         onSnapshot(ticketsQuery, snapshot => {
             setAllTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
-            setLoading(false); // Stop loading once tickets are fetched
-        }),
+        }, () => setAllTickets([])),
         onSnapshot(collection(db, "technicians"), snapshot => {
             setAllTechnicians(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician)));
-        }),
+        }, () => setAllTechnicians([])),
         onSnapshot(collection(db, "users"), snapshot => {
             setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
-        }),
+        }, () => setAllUsers([])),
         onSnapshot(collection(db, 'sectors'), snapshot => {
             setAllSectors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector)));
-        }),
+        }, () => setAllSectors([])),
     ];
 
-    return () => unsubscribes.forEach(unsub => unsub());
+    // Failsafe to turn off loading
+    const timer = setTimeout(() => setLoading(false), 3000);
+
+    return () => {
+        unsubscribes.forEach(unsub => unsub())
+        clearTimeout(timer);
+    };
   }, []);
 
   const techniciansOnRoute = useMemo(() => {
@@ -181,3 +186,5 @@ export default function LocationPage() {
     </>
   );
 }
+
+    
