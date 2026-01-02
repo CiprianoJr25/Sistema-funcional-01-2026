@@ -1,45 +1,22 @@
 
-/*
-This is a placeholder for your Cloud Storage for Firebase security rules.
-By default, it is set to allow read and write access to all authenticated users.
-
-This file is also used to configure CORS for your bucket. The Firebase Studio
-backend will detect the cors.json configuration below and apply it to your
-Cloud Storage for Firebase bucket.
-
-For more information, see: https://firebase.google.com/docs/storage/web/cors
-*/
-/*
-cors.json
-[
-  {
-    "origin": ["*"],
-    "method": ["GET", "POST", "PUT", "HEAD"],
-    "responseHeader": ["Content-Type"],
-    "maxAgeSeconds": 3600
-  }
-]
-*/
-
-
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Qualquer usuário autenticado pode ler qualquer arquivo.
+    // Permite que qualquer usuário autenticado leia arquivos (para visualizar fotos).
     allow read: if request.auth != null;
 
-    // Regra para avatares:
-    // Apenas o próprio usuário pode criar, atualizar ou deletar seu avatar.
+    // Permite que um usuário autenticado escreva qualquer arquivo dentro de sua própria pasta de avatar.
     match /avatars/{userId}/{allPaths=**} {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Regra para arquivos de chamados (fotos e assinaturas):
-    // Qualquer usuário autenticado pode adicionar arquivos a um chamado.
+    // Permite que qualquer usuário autenticado adicione arquivos a um chamado.
     match /tickets/{ticketId}/{allPaths=**} {
       allow write: if request.auth != null;
     }
   }
 }
+
+    
