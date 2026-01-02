@@ -72,7 +72,7 @@ const ActionsCell = ({ row, onStatusChange, onEdit, onViewDetails }: { row: any,
       <div onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
+            <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
               <span className="sr-only">Abrir menu</span>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
@@ -274,7 +274,14 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  onDoubleClick={() => handleRowDoubleClick(row)}
+                  onDoubleClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    // Previne que o duplo clique seja acionado se o clique foi em um botão ou dentro de um menu
+                    if (target.closest('button') || target.closest('[role="menu"]')) {
+                      return;
+                    }
+                    handleRowDoubleClick(row);
+                  }}
                   className="cursor-pointer"
                 >
                   {row.getVisibleCells().map((cell) => (
