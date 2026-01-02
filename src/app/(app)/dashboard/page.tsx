@@ -31,43 +31,43 @@ export default function Dashboard() {
 
   useEffect(() => {
     setLoading(true);
-    
+
     const collectionsToFetch = [
-      { name: 'external-tickets', setter: setExternalTickets },
-      { name: 'internal-tickets', setter: setInternalTickets },
-      { name: 'technicians', setter: setTechnicians },
-      { name: 'sectors', setter: setSectors },
-      { name: 'users', setter: setUsers },
+        { name: 'external-tickets', setter: setExternalTickets },
+        { name: 'internal-tickets', setter: setInternalTickets },
+        { name: 'technicians', setter: setTechnicians },
+        { name: 'sectors', setter: setSectors },
+        { name: 'users', setter: setUsers },
     ];
 
     let loadedCount = 0;
+    const totalCollections = collectionsToFetch.length;
 
     const unsubscribes = collectionsToFetch.map(({ name, setter }) => {
-      const q = query(collection(db, name));
-      return onSnapshot(q, 
-        (snapshot) => {
-          setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
-          loadedCount++;
-          if (loadedCount === collectionsToFetch.length) {
-            setLoading(false);
-          }
-        },
-        (error) => {
-          console.error(`Error fetching ${name}:`, error);
-          // Mesmo em caso de erro (ex: coleção não existe), consideramos "carregado"
-          // para não travar a UI.
-          loadedCount++;
-          if (loadedCount === collectionsToFetch.length) {
-            setLoading(false);
-          }
-        }
-      );
+        const q = query(collection(db, name));
+        return onSnapshot(q, 
+            (snapshot) => {
+                setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
+                loadedCount++;
+                if (loadedCount === totalCollections) {
+                    setLoading(false);
+                }
+            },
+            (error) => {
+                console.warn(`A coleção '${name}' não foi encontrada ou ocorreu um erro. Tratando como vazia.`, error);
+                setter([]); // Garante que o estado seja um array vazio em caso de erro
+                loadedCount++;
+                if (loadedCount === totalCollections) {
+                    setLoading(false);
+                }
+            }
+        );
     });
 
-    // Timeout de segurança para garantir que o loading não fique preso
+    // Failsafe: se algo der muito errado, desativa o loading após 5 segundos.
     const timer = setTimeout(() => {
         if (loading) {
-            console.warn("Loading timeout reached. Forcing UI to render.");
+            console.warn("Timeout de carregamento atingido. Forçando a renderização da UI.");
             setLoading(false);
         }
     }, 5000);
@@ -75,8 +75,9 @@ export default function Dashboard() {
     return () => {
         unsubscribes.forEach(unsub => unsub());
         clearTimeout(timer);
-    }
-  }, []);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   const filteredData = useMemo(() => {
     const now = new Date();
