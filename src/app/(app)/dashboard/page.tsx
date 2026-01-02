@@ -25,13 +25,10 @@ export default function Dashboard() {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("this-month");
 
 
   useEffect(() => {
-    setLoading(true);
-
     const unsubscribes = [
       onSnapshot(collection(db, 'external-tickets'), snapshot => {
         setExternalTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
@@ -49,15 +46,9 @@ export default function Dashboard() {
         setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
       }, () => setUsers([])),
     ];
-    
-    // Allow a moment for Firestore to connect and return initial data
-    const timer = setTimeout(() => {
-        setLoading(false);
-    }, 1500);
 
     return () => {
         unsubscribes.forEach(unsub => unsub());
-        clearTimeout(timer);
     }
   }, []);
 
@@ -91,7 +82,7 @@ export default function Dashboard() {
   }, [period, externalTickets, internalTickets]);
 
 
-  if (loading || !user) {
+  if (!user) {
     return (
         <div className="flex h-full w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -291,3 +282,5 @@ export default function Dashboard() {
     </>
   )
 }
+
+    

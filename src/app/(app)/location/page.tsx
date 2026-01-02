@@ -17,12 +17,10 @@ export default function LocationPage() {
   const [allTechnicians, setAllTechnicians] = useState<Technician[]>([]);
   const [allSectors, setAllSectors] = useState<Sector[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
   const [sectorFilter, setSectorFilter] = useState('all');
   const { user } = useAuth();
 
   useEffect(() => {
-    setLoading(true);
     const ticketsQuery = query(collection(db, "external-tickets"), where("status", "in", ["em andamento", "concluído"]));
     
     const unsubscribes = [
@@ -40,7 +38,6 @@ export default function LocationPage() {
         }),
     ];
 
-    setLoading(false); // Stop loading indicator, data will stream in
     return () => unsubscribes.forEach(unsub => unsub());
   }, []);
 
@@ -153,29 +150,23 @@ export default function LocationPage() {
         />
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      ) : (
-        <div className="mt-6 space-y-8">
-          {techniciansOnRoute.length > 0 ? (
-            techniciansOnRoute.map(({ technician, ticketsWithAddress, ticketsWithoutAddress, offRouteTickets }) => (
-              <TechnicianRouteCard 
-                key={technician.id} 
-                technician={technician} 
-                ticketsWithAddress={ticketsWithAddress}
-                ticketsWithoutAddress={ticketsWithoutAddress}
-                offRouteTickets={offRouteTickets}
-              />
-            ))
-          ) : (
-            <div className="col-span-full text-center text-muted-foreground py-10 rounded-lg border bg-card">
-                Nenhum técnico em rota no setor selecionado.
-            </div>
-          )}
-        </div>
-      )}
+      <div className="mt-6 space-y-8">
+        {techniciansOnRoute.length > 0 ? (
+          techniciansOnRoute.map(({ technician, ticketsWithAddress, ticketsWithoutAddress, offRouteTickets }) => (
+            <TechnicianRouteCard 
+              key={technician.id} 
+              technician={technician} 
+              ticketsWithAddress={ticketsWithAddress}
+              ticketsWithoutAddress={ticketsWithoutAddress}
+              offRouteTickets={offRouteTickets}
+            />
+          ))
+        ) : (
+          <div className="col-span-full text-center text-muted-foreground py-10 rounded-lg border bg-card">
+              Nenhum técnico em rota no setor selecionado.
+          </div>
+        )}
+      </div>
     </>
   );
 }
