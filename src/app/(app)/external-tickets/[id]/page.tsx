@@ -14,6 +14,7 @@ import { doc, onSnapshot, updateDoc, arrayUnion, collection, getDocs, deleteFiel
 import { db, storage } from '@/firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { sendWhatsappMessage } from '@/lib/services/notification-service';
+import { optimizeImage, optimizeSignature } from '@/lib/image-optimizer';
 
 export default function ExternalTicketDetailsPage() {
   const params = useParams();
@@ -155,16 +156,22 @@ const handleFinalizeTicket = async (id: string, observations: string, photos: Fi
     try {
         const photoURLs = await Promise.all(
             photos.map(async (photo) => {
-                const photoRef = ref(storage, `tickets/${id}/${Date.now()}-${photo.name}`);
-                await uploadBytes(photoRef, photo);
+                const optimizedPhoto = await optimizeImage(photo);
+                const photoRef = ref(storage, `tickets/${id}/${Date.now()}-${optimizedPhoto.name}`);
+                await uploadBytes(photoRef, optimizedPhoto);
                 return await getDownloadURL(photoRef);
             })
         );
         
+        let finalSignatureUrl: string | undefined = undefined;
+        if (signatureDataUrl) {
+            finalSignatureUrl = await optimizeSignature(signatureDataUrl);
+        }
+
         const newTechnicalReport: TechnicalReport = {
             observations: observations,
             photos: photoURLs,
-            ...(signatureDataUrl && { signature: signatureDataUrl }),
+            ...(finalSignatureUrl && { signature: finalSignatureUrl }),
         };
 
         const finalizationTime = new Date().toISOString();
