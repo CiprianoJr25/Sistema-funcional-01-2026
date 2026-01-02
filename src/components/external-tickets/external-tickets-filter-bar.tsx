@@ -61,13 +61,13 @@ export function ExternalTicketsFilterBar({
     const canFilterBySector = useMemo(() => {
         if (!currentUser) return false;
         if (currentUser.role === 'admin' || currentUser.role === 'gerente') return true;
-        if (currentUser.role === 'encarregado' && (currentUser.sectorIds?.length ?? 0) > 1) return true;
+        if ((currentUser.role === 'encarregado' || currentUser.role === 'tecnico') && (currentUser.sectorIds?.length ?? 0) > 1) return true;
         return false;
     }, [currentUser]);
 
     const userSectors = useMemo(() => {
         if (!currentUser) return [];
-        if (currentUser.role === 'encarregado') {
+        if (currentUser.role === 'encarregado' || currentUser.role === 'tecnico') {
             return sectors.filter(s => currentUser?.sectorIds?.includes(s.id));
         }
         return sectors;
