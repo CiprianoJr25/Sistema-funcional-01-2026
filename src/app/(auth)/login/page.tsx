@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -35,7 +36,8 @@ export default function LoginPage() {
 
 
   const getRedirectPath = () => {
-      return isMobile ? '/external-tickets' : '/dashboard';
+      // Redireciona para a página de configurações, que é mais leve e não depende de dados.
+      return '/settings';
   }
 
   // Redirect if user is already logged in
