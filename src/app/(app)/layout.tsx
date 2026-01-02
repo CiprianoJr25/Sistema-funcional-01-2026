@@ -14,65 +14,28 @@ import type { User } from '@/lib/types';
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-    const { user: realUser, loading } = useAuth();
+    const { user, loading } = useAuth();
     const router = useRouter();
     const sidebar = useOptionalSidebar();
-    const searchParams = useSearchParams();
-
-    // --- Sua Ideia Implementada ---
-    const isMockMode = searchParams.get('mock') === 'true';
-    const mockUser: User = {
-        id: 'mock-admin-id',
-        name: 'Usuário Mock (Admin)',
-        email: 'mock@sistema.com',
-        role: 'admin',
-        status: 'active',
-        sectorIds: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        permissions: {
-            dashboard: 'write',
-            external_tickets: 'write',
-            internal_tickets: 'write',
-            routes: 'write',
-            planning: 'write',
-            reports: 'write',
-            history: 'write',
-            clients: 'write',
-            technicians: 'write',
-            location: 'write',
-            monitoring: 'write',
-        }
-    };
-    
-    const user = isMockMode ? mockUser : realUser;
-    // ---------------------------------
    
     useEffect(() => {
-      // O modo mock ignora a verificação de redirecionamento
-      if (isMockMode) return;
-
-      if (!loading && !user) {
+      // Se ainda estiver verificando a autenticação, não faça nada.
+      if (loading) {
+        return;
+      }
+      // Se a verificação terminou e não há usuário, redirecione para o login.
+      if (!user) {
         router.replace('/login');
       }
-    }, [user, loading, router, isMockMode]);
+    }, [user, loading, router]);
     
-    // Em modo mock, não mostramos a tela de carregamento, vamos direto ao ponto.
-    if (!isMockMode && (loading || !user)) {
+    // Mostra a tela de carregamento enquanto o useAuth verifica o estado do usuário.
+    if (loading || !user) {
       return (
         <div className="flex h-screen w-full items-center justify-center bg-background">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       );
-    }
-  
-    // Se o usuário é nulo, mas estamos em mock mode, isso não deve acontecer, mas é uma segurança.
-    if (!user) {
-        return (
-             <div className="flex h-screen w-full items-center justify-center bg-background">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-             </div>
-        );
     }
 
     return (

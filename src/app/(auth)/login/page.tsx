@@ -38,9 +38,6 @@ export default function LoginPage() {
 
   const getRedirectPath = () => {
     // A rota principal do sistema após o login é o dashboard.
-    if (isMobile) {
-        return '/external-tickets';
-    }
     return '/dashboard';
   }
 
@@ -49,7 +46,7 @@ export default function LoginPage() {
     if (!authLoading && user) {
       router.replace(getRedirectPath());
     }
-  }, [user, authLoading, router, isMobile]);
+  }, [user, authLoading, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
