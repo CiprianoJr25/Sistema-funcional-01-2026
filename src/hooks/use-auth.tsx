@@ -52,12 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           if (userDocSnap.exists()) {
             const appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-            // Compatibility Layer: ensure sectorIds exists and handles legacy sectorId
-            if ((appUser as any).sectorId && !appUser.sectorIds) {
-                appUser.sectorIds = [(appUser as any).sectorId];
-            } else if (!appUser.sectorIds) {
-                appUser.sectorIds = [];
+            
+            // Robust Compatibility Layer
+            if (!appUser.sectorIds || !Array.isArray(appUser.sectorIds)) {
+                if ((appUser as any).sectorId) {
+                    appUser.sectorIds = [(appUser as any).sectorId];
+                } else {
+                    appUser.sectorIds = [];
+                }
             }
+
             setUser(appUser);
           } else {
             // User exists in Auth but not in Firestore.
