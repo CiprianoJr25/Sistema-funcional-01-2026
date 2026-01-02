@@ -1,4 +1,5 @@
 
+
 export type Role = 'admin' | 'gerente' | 'encarregado' | 'tecnico' | 'vendedor';
 export type UserStatus = 'active' | 'inactive' | 'pending_invitation';
 
@@ -90,6 +91,17 @@ export interface PreventiveContract {
   frequencyDays: number;
 }
 
+export interface ServiceContract {
+  id: string;
+  clientId: string;
+  clientName: string;
+  sectorIds: string[];
+  frequencyDays: number;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Client {
     id: string;
     name: string;
@@ -98,6 +110,7 @@ export interface Client {
     address: Address;
     status: 'active' | 'inactive';
     slaHours?: number;
+    // O preventiveContract será removido para dar lugar ao ServiceContract
     preventiveContract?: PreventiveContract;
     euroInfoId?: string;
     rondoInfoId?: string;

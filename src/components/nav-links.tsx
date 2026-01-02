@@ -19,6 +19,7 @@ import {
   Calendar,
   CalendarCheck,
   MessageSquare,
+  FileText,
 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarSeparator } from "@/components/ui/sidebar"
@@ -51,6 +52,7 @@ const primaryNavItems: NavItem[] = [
 const secondaryNavItems: NavItem[] = [
     { href: "/monitoring", icon: Activity, label: "Monitoramento", roles: ["admin", "gerente"], permissionKey: "monitoring", mobileKey: "dashboard" }, // No mobile key for this one
     { href: "/clients", icon: User, label: "Clientes", roles: ["admin", "gerente", "encarregado", "tecnico"], permissionKey: "clients", mobileKey: "dashboard" },
+    { href: "/contracts", icon: FileText, label: "Contratos", roles: ["admin", "gerente", "encarregado"], permissionKey: "clients", mobileKey: "dashboard" },
     { href: "/sectors", icon: Building2, label: "Setores", roles: ["admin", "gerente"], permissionKey: "technicians", mobileKey: "dashboard" }, // Assuming sectors are part of technician management
     { href: "/users", icon: Users, label: "Usuários", roles: ["admin", "gerente"], permissionKey: "technicians", mobileKey: "dashboard" }, // Assuming users are part of technician management
     { href: "/technicians", icon: UserCheck, label: "Técnicos", roles: ["admin", "gerente", "encarregado"], permissionKey: "technicians", mobileKey: "dashboard" },
