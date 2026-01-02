@@ -37,7 +37,11 @@ export default function LoginPage() {
   }, [setTheme]);
 
   const getRedirectPath = () => {
-      return '/settings';
+    // A rota principal do sistema após o login é o dashboard.
+    if (isMobile) {
+        return '/external-tickets';
+    }
+    return '/dashboard';
   }
 
   // Redirect if user is already logged in

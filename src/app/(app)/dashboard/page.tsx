@@ -43,7 +43,8 @@ export default function Dashboard() {
     let loadedCount = 0;
 
     const unsubscribes = collectionsToFetch.map(({ name, setter }) => {
-      return onSnapshot(collection(db, name), 
+      const q = query(collection(db, name));
+      return onSnapshot(q, 
         (snapshot) => {
           setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
           loadedCount++;
@@ -53,7 +54,8 @@ export default function Dashboard() {
         },
         (error) => {
           console.error(`Error fetching ${name}:`, error);
-          setter([]); // Set to empty array on error
+          // Mesmo em caso de erro (ex: coleção não existe), consideramos "carregado"
+          // para não travar a UI.
           loadedCount++;
           if (loadedCount === collectionsToFetch.length) {
             setLoading(false);
@@ -62,9 +64,10 @@ export default function Dashboard() {
       );
     });
 
-    // Safety timeout in case some collection listener fails silently
+    // Timeout de segurança para garantir que o loading não fique preso
     const timer = setTimeout(() => {
         if (loading) {
+            console.warn("Loading timeout reached. Forcing UI to render.");
             setLoading(false);
         }
     }, 5000);
@@ -73,7 +76,6 @@ export default function Dashboard() {
         unsubscribes.forEach(unsub => unsub());
         clearTimeout(timer);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredData = useMemo(() => {
@@ -96,8 +98,8 @@ export default function Dashboard() {
             break;
     }
 
-    const filteredExternal = externalTickets.filter(t => isWithinInterval(parseISO(t.createdAt), interval));
-    const filteredInternal = internalTickets.filter(t => isWithinInterval(parseISO(t.createdAt), interval));
+    const filteredExternal = externalTickets.filter(t => t.createdAt && isWithinInterval(parseISO(t.createdAt), interval));
+    const filteredInternal = internalTickets.filter(t => t.createdAt && isWithinInterval(parseISO(t.createdAt), interval));
 
     return {
         externalTickets: filteredExternal,
@@ -306,5 +308,3 @@ export default function Dashboard() {
     </>
   )
 }
-
-    
