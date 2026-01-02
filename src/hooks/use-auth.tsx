@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { useToast } from './use-toast';
 import app, { db } from '@/firebase/config';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -33,28 +32,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userDocRef = doc(db, "users", firebaseUser.uid);
           let userDocSnap = await getDoc(userDocRef);
 
-          // Lógica especial para auto-promoção de um novo usuário para ADMIN
-          // Isso serve como um backdoor seguro para criar um admin se a UI estiver inacessível.
-          if (!userDocSnap.exists() && firebaseUser.email?.endsWith('@euroinfo.com.br')) {
-              console.log(`Creating new admin profile for: ${firebaseUser.email}`);
-              const newAdminUser: User = {
-                  id: firebaseUser.uid,
-                  name: firebaseUser.email.split('@')[0], // Usa a parte local do email como nome
-                  email: firebaseUser.email,
-                  role: 'admin', // Promove para admin
-                  status: 'active',
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                  sectorIds: [], // Admins não precisam de setor
-              };
-              await setDoc(userDocRef, newAdminUser);
-              userDocSnap = await getDoc(userDocRef); // Re-busca o documento após a criação
-              toast({
-                  title: "Perfil de Administrador Criado!",
-                  description: "Um novo perfil de administrador foi configurado para este usuário."
-              });
-          }
-
           if (userDocSnap.exists()) {
             const appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
             
@@ -65,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             setUser(appUser);
           } else {
-            // Se o usuário está autenticado mas não tem perfil no DB (e não é o caso especial acima)
+            // Se o usuário está autenticado mas não tem perfil no DB
             toast({
               variant: "destructive",
               title: "Erro de Dados do Usuário",
