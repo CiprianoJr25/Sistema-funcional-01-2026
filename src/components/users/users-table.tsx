@@ -241,7 +241,8 @@ const ActionsCell = ({ row, currentUser, onEdit, onEditPermissions, onStatusChan
   
   const canManage = !isGerenteManagingGerente && !isAdminManagingAdmin && !isSelf;
   
-  const handleActionClick = (type: 'activate' | 'deactivate') => {
+  const handleActionClick = (e: React.MouseEvent, type: 'activate' | 'deactivate') => {
+    e.stopPropagation();
     setActionType(type);
     setIsAlertOpen(true);
   }
@@ -257,37 +258,37 @@ const ActionsCell = ({ row, currentUser, onEdit, onEditPermissions, onStatusChan
     <>
         <DropdownMenu>
         <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
+            <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
             <span className="sr-only">Abrir menu</span>
             <MoreHorizontal className="h-4 w-4" />
             </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuLabel>Ações</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => navigator.clipboard.writeText(user.id)}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(user.id); }}>
               Copiar ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onEdit(user)} disabled={!canManage}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(user); }} disabled={!canManage}>
                 Editar Usuário
             </DropdownMenuItem>
-             <DropdownMenuItem onClick={() => onEditPermissions(user)} disabled={!canManage}>
+             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditPermissions(user); }} disabled={!canManage}>
                 Editar Permissões
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {user.status === 'active' ? (
-                <DropdownMenuItem onClick={() => handleActionClick('deactivate')} disabled={!canManage} className="text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={(e) => handleActionClick(e, 'deactivate')} disabled={!canManage} className="text-destructive focus:text-destructive">
                     Desativar
                 </DropdownMenuItem>
             ) : (
-                <DropdownMenuItem onClick={() => handleActionClick('activate')} disabled={!canManage}>
+                <DropdownMenuItem onClick={(e) => handleActionClick(e, 'activate')} disabled={!canManage}>
                     Reativar
                 </DropdownMenuItem>
             )}
         </DropdownMenuContent>
         </DropdownMenu>
          <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-            <AlertDialogContent>
+            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
             <AlertDialogHeader>
                 <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                 <AlertDialogDescription>
@@ -458,7 +459,7 @@ export function UsersTable({ data, sectors, onDataChange, onSaveUser, onSavePerm
           <Label htmlFor="show-inactive">Mostrar inativos</Label>
         </div>
       </div>
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -488,7 +489,7 @@ export function UsersTable({ data, sectors, onDataChange, onSaveUser, onSavePerm
                   className="cursor-pointer"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} onClick={(e) => { if (cell.column.id === 'actions') e.stopPropagation()}}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
