@@ -247,11 +247,22 @@ const ActionsCell = ({ row, currentUser, onEdit, onEditPermissions, onStatusChan
     setIsAlertOpen(true);
   }
   
-  const handleConfirmAction = () => {
+  const handleConfirmAction = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (actionType) {
       onStatusChange(user, actionType === 'activate' ? 'active' : 'inactive');
     }
     setIsAlertOpen(false);
+  }
+
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(user);
+  }
+
+  const handlePermissionsClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEditPermissions(user);
   }
 
   return (
@@ -269,10 +280,10 @@ const ActionsCell = ({ row, currentUser, onEdit, onEditPermissions, onStatusChan
               Copiar ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(user); }} disabled={!canManage}>
+            <DropdownMenuItem onClick={handleEditClick} disabled={!canManage}>
                 Editar Usuário
             </DropdownMenuItem>
-             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditPermissions(user); }} disabled={!canManage}>
+             <DropdownMenuItem onClick={handlePermissionsClick} disabled={!canManage}>
                 Editar Permissões
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -296,7 +307,7 @@ const ActionsCell = ({ row, currentUser, onEdit, onEditPermissions, onStatusChan
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction onClick={handleConfirmAction}>Confirmar</AlertDialogAction>
             </AlertDialogFooter>
             </AlertDialogContent>

@@ -220,54 +220,66 @@ const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onEditPermission
   const [isAlertOpen, setIsAlertOpen] = React.useState(false);
   const [actionType, setActionType] = React.useState<'activate' | 'deactivate' | null>(null);
 
-  const handleActionClick = (type: 'activate' | 'deactivate') => {
+  const handleActionClick = (e: React.MouseEvent, type: 'activate' | 'deactivate') => {
+    e.stopPropagation();
     setActionType(type);
     setIsAlertOpen(true);
   }
   
-  const handleConfirmAction = () => {
+  const handleConfirmAction = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (actionType) {
       onStatusChange(technician, actionType === 'activate' ? 'active' : 'inactive');
     }
     setIsAlertOpen(false);
   }
 
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(technician);
+  }
+
+  const handlePermissionsClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEditPermissions(technician);
+  }
+
   return (
     <>
         <DropdownMenu>
         <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
+            <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
             <span className="sr-only">Abrir menu</span>
             <MoreHorizontal className="h-4 w-4" />
             </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuLabel>Ações</DropdownMenuLabel>
             <DropdownMenuItem
-            onClick={() => navigator.clipboard.writeText(technician.id)}
+            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(technician.id); }}
             >
             Copiar ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onEdit(technician)}>
+            <DropdownMenuItem onClick={handleEditClick}>
                 Editar Técnico
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEditPermissions(technician)} disabled={technician.status !== 'active'}>
+            <DropdownMenuItem onClick={handlePermissionsClick} disabled={technician.status !== 'active'}>
                 Editar Permissões
             </DropdownMenuItem>
             {technician.status === 'active' ? (
-                <DropdownMenuItem onClick={() => handleActionClick('deactivate')} className="text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={(e) => handleActionClick(e, 'deactivate')} className="text-destructive focus:text-destructive">
                     Desativar
                 </DropdownMenuItem>
             ) : (
-                 <DropdownMenuItem onClick={() => handleActionClick('activate')}>
+                 <DropdownMenuItem onClick={(e) => handleActionClick(e, 'activate')}>
                     Reativar
                 </DropdownMenuItem>
             )}
         </DropdownMenuContent>
         </DropdownMenu>
          <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-            <AlertDialogContent>
+            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
             <AlertDialogHeader>
                 <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                 <AlertDialogDescription>
@@ -275,7 +287,7 @@ const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onEditPermission
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction onClick={handleConfirmAction}>Confirmar</AlertDialogAction>
             </AlertDialogFooter>
             </AlertDialogContent>
@@ -473,7 +485,7 @@ export function TechniciansTable({ data, sectors, onDataChange, onSavePermission
                   className="cursor-pointer"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} onClick={(e) => { if (cell.column.id === 'actions') e.stopPropagation(); }}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()

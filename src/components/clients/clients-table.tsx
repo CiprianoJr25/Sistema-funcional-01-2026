@@ -51,49 +51,56 @@ const ActionsCell = ({ row, onStatusChange, onEdit }: { row: any, onStatusChange
   const [isAlertOpen, setIsAlertOpen] = React.useState(false);
   const [actionType, setActionType] = React.useState<ActionType | null>(null);
 
-  const handleActionClick = (type: ActionType) => {
+  const handleActionClick = (e: React.MouseEvent, type: ActionType) => {
+    e.stopPropagation();
     setActionType(type);
     setIsAlertOpen(true);
   }
 
-  const handleConfirmAction = () => {
+  const handleConfirmAction = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (actionType) {
       onStatusChange(client, actionType === 'activate' ? 'active' : 'inactive');
     }
     setIsAlertOpen(false);
+  }
+  
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(client);
   }
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
+          <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
             <span className="sr-only">Abrir menu</span>
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenuLabel>Ações</DropdownMenuLabel>
           <DropdownMenuItem
-            onClick={() => navigator.clipboard.writeText(client.id)}
+            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(client.id); }}
           >
             Copiar ID
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => onEdit(client)}>Editar</DropdownMenuItem>
+          <DropdownMenuItem onClick={handleEditClick}>Editar</DropdownMenuItem>
           {client.status === 'active' ? (
-              <DropdownMenuItem onClick={() => handleActionClick('deactivate')} className="text-destructive focus:text-destructive">
+              <DropdownMenuItem onClick={(e) => handleActionClick(e, 'deactivate')} className="text-destructive focus:text-destructive">
                   Desativar
               </DropdownMenuItem>
           ) : (
-              <DropdownMenuItem onClick={() => handleActionClick('activate')}>
+              <DropdownMenuItem onClick={(e) => handleActionClick(e, 'activate')}>
                   Reativar
               </DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
        <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
           <AlertDialogHeader>
             <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -101,7 +108,7 @@ const ActionsCell = ({ row, onStatusChange, onEdit }: { row: any, onStatusChange
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmAction}>Confirmar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -267,7 +274,7 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
                   className="cursor-pointer"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} onClick={(e) => { if (cell.column.id === 'actions') e.stopPropagation(); }}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
