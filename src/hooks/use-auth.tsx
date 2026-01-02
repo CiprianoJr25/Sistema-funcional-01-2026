@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
@@ -27,6 +28,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Ignora o onAuthStateChanged se um usuário mock já estiver setado
+      if (user?.id === 'mock-admin-id') {
+        setLoading(false);
+        return;
+      }
+      
       if (firebaseUser) {
         try {
           const userDocRef = doc(db, "users", firebaseUser.uid);
@@ -42,7 +49,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             setUser(appUser);
           } else {
-            // Se o usuário está autenticado mas não tem perfil no DB
             toast({
               variant: "destructive",
               title: "Erro de Dados do Usuário",
@@ -67,12 +73,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, [toast, user]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
+    // --- Login Mestre (Sua Ideia) ---
+    if (email === 'dev@nexus.com' && password === '123456') {
+      const mockUser: User = {
+        id: 'mock-admin-id',
+        name: 'Usuário Mestre',
+        email: 'dev@nexus.com',
+        role: 'admin',
+        status: 'active',
+        sectorIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        permissions: {
+            dashboard: 'write', external_tickets: 'write', internal_tickets: 'write',
+            routes: 'write', planning: 'write', reports: 'write', history: 'write',
+            clients: 'write', technicians: 'write', location: 'write', monitoring: 'write',
+        }
+      };
+      setUser(mockUser);
+      setLoading(false);
+      toast({ title: 'Bem-vindo, Mestre!', description: 'Acesso de desenvolvimento concedido.' });
+      return true;
+    }
+    // --- Fim do Login Mestre ---
+    
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged irá cuidar de definir o usuário e o estado de carregamento.
       return true;
     } catch (error) {
       console.error("Login Error:", error);
@@ -86,6 +115,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    // Se for o usuário mock, apenas limpa o estado local
+    if (user?.id === 'mock-admin-id') {
+      setUser(null);
+      router.push('/login');
+      return;
+    }
     try {
       await signOut(auth);
       setUser(null);
