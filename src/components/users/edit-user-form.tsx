@@ -34,6 +34,8 @@ const formSchema = z.object({
   phone: z.string().optional(),
   role: z.enum(["gerente", "encarregado", "vendedor"], { required_error: "Selecione um cargo." }),
   sectorIds: z.array(z.string()).optional(),
+  euroInfoId: z.string().optional(),
+  rondoInfoId: z.string().optional(),
 }).refine(data => !(data.role === 'encarregado' && (!data.sectorIds || data.sectorIds.length === 0)), {
     message: "O setor é obrigatório para encarregados.",
     path: ["sectorIds"],
@@ -59,6 +61,8 @@ export function EditUserForm({ user, onSave, onFinished, sectors }: EditUserForm
       phone: user.phone || "",
       role: user.role as 'gerente' | 'encarregado' | 'vendedor',
       sectorIds: user.sectorIds || [],
+      euroInfoId: user.euroInfoId || "",
+      rondoInfoId: user.rondoInfoId || "",
     },
   });
 
@@ -100,6 +104,34 @@ export function EditUserForm({ user, onSave, onFinished, sectors }: EditUserForm
               </FormItem>
             )}
           />
+           <div className="grid grid-cols-2 gap-4">
+            <FormField
+                control={form.control}
+                name="euroInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID EuroInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+            <FormField
+                control={form.control}
+                name="rondoInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID RondoInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+          </div>
           <FormField
             control={form.control}
             name="role"

@@ -34,8 +34,10 @@ const formSchema = z.object({
   email: z.string().email({ message: "Email inválido." }),
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   phone: z.string().optional(),
-  role: z.enum(["gerente", "encarregado", "vendedor"], { required_error: "Selecione um cargo." }),
+  role: z.enum(["admin", "gerente", "encarregado", "vendedor"], { required_error: "Selecione um cargo." }),
   sectorIds: z.array(z.string()).optional(),
+  euroInfoId: z.string().optional(),
+  rondoInfoId: z.string().optional(),
 }).refine(data => !(data.role === 'encarregado' && (!data.sectorIds || data.sectorIds.length === 0)), {
     message: "O setor é obrigatório para encarregados.",
     path: ["sectorIds"],
@@ -60,6 +62,8 @@ export function NewUserForm({ onSave, onFinished, sectors }: NewUserFormProps) {
       phone: "",
       role: undefined,
       sectorIds: [],
+      euroInfoId: "",
+      rondoInfoId: "",
     },
   });
 
@@ -128,6 +132,34 @@ export function NewUserForm({ onSave, onFinished, sectors }: NewUserFormProps) {
               </FormItem>
             )}
           />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+                control={form.control}
+                name="euroInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID EuroInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+            <FormField
+                control={form.control}
+                name="rondoInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID RondoInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+          </div>
           <FormField
             control={form.control}
             name="role"
@@ -141,6 +173,7 @@ export function NewUserForm({ onSave, onFinished, sectors }: NewUserFormProps) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="gerente">Gerente</SelectItem>
                     <SelectItem value="encarregado">Encarregado</SelectItem>
                     <SelectItem value="vendedor">Vendedor</SelectItem>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -15,23 +14,22 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Sector } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 import { useMemo } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { cn } from "@/lib/utils";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "O nome é obrigatório." }),
   email: z.string().email({ message: "Email inválido." }),
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   phone: z.string().optional(),
-  sectorId: z.string({ required_error: "Selecione um setor." }),
+  sectorIds: z.array(z.string()).min(1, { message: "Selecione pelo menos um setor." }),
+  euroInfoId: z.string().optional(),
+  rondoInfoId: z.string().optional(),
 });
 
 export type NewTechnicianFormValues = z.infer<typeof formSchema>;
@@ -52,8 +50,9 @@ export function NewTechnicianForm({ onSave, onFinished, sectors }: NewTechnician
       email: "",
       password: "",
       phone: "",
-      // If user is an encarregado with only one sector, pre-select it.
-      sectorId: user?.role === 'encarregado' && user.sectorIds?.length === 1 ? user.sectorIds[0] : undefined,
+      sectorIds: user?.role === 'encarregado' && user.sectorIds?.length === 1 ? user.sectorIds : [],
+      euroInfoId: "",
+      rondoInfoId: "",
     },
   });
 
@@ -72,13 +71,11 @@ export function NewTechnicianForm({ onSave, onFinished, sectors }: NewTechnician
     return [];
   }, [user, sectors]);
 
-  // Determine if the sector selection should be enabled
-  const canSelectSector = user?.role === 'admin' || user?.role === 'gerente' || (user?.role === 'encarregado' && (user.sectorIds?.length ?? 0) > 0);
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
           <FormField
             control={form.control}
             name="name"
@@ -134,28 +131,93 @@ export function NewTechnicianForm({ onSave, onFinished, sectors }: NewTechnician
               </FormItem>
             )}
           />
-          
+          <div className="grid grid-cols-2 gap-4">
+             <FormField
+                control={form.control}
+                name="euroInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID EuroInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+             <FormField
+                control={form.control}
+                name="rondoInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID RondoInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+          </div>
             <FormField
               control={form.control}
-              name="sectorId"
+              name="sectorIds"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Setor</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={!canSelectSector}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o setor do técnico" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {visibleSectors.map((sector) => (
-                        <SelectItem key={sector.id} value={sector.id}>
-                          {sector.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
+                 <FormItem className="flex flex-col">
+                    <FormLabel>Setores</FormLabel>
+                     <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between",
+                              !field.value?.length && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value && field.value.length > 0
+                              ? `${field.value.length} setor(es) selecionado(s)`
+                              : "Selecione os setores"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput placeholder="Buscar setor..." />
+                          <CommandEmpty>Nenhum setor encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandList>
+                                {visibleSectors.map((sector) => (
+                                <CommandItem
+                                    value={sector.name}
+                                    key={sector.id}
+                                    onSelect={() => {
+                                    const currentIds = field.value || [];
+                                    const newIds = currentIds.includes(sector.id)
+                                        ? currentIds.filter((id) => id !== sector.id)
+                                        : [...currentIds, sector.id];
+                                    field.onChange(newIds);
+                                    }}
+                                >
+                                    <Check
+                                    className={cn(
+                                        "mr-2 h-4 w-4",
+                                        field.value?.includes(sector.id)
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                    />
+                                    {sector.name}
+                                </CommandItem>
+                                ))}
+                            </CommandList>
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
                 </FormItem>
               )}
             />

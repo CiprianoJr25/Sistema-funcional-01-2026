@@ -129,7 +129,7 @@ export default function SettingsPage() {
     if (!avatarFile || !user) return;
 
     setIsUploading(true);
-    const storageRef = ref(storage, `avatars/${user.id}`);
+    const storageRef = ref(storage, `avatars/${user.id}/${avatarFile.name}`);
 
     try {
       await uploadBytes(storageRef, avatarFile);
@@ -517,3 +517,5 @@ export default function SettingsPage() {
     </>
   );
 }
+
+    

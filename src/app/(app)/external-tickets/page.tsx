@@ -73,56 +73,46 @@ export default function ExternalTicketsPage() {
     }
   }, [isMobile]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [usersSnapshot, sectorsSnapshot, techsSnapshot] = await Promise.all([
-        getDocs(collection(db, "users")),
-        getDocs(collection(db, "sectors")),
-        getDocs(collection(db, "technicians")),
-      ]);
-      
-      const usersData = usersSnapshot.docs.map(doc => {
-          const userData = { id: doc.id, ...doc.data() } as User;
-           if ((userData as any).sectorId && !userData.sectorIds) {
-              userData.sectorIds = [(userData as any).sectorId];
-          } else if (!userData.sectorIds) {
-              userData.sectorIds = [];
-          }
-          return userData;
-      });
-      const sectorsData = sectorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector));
-      const techsData = techsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
-      
-      setUsers(usersData);
-      setSectors(sectorsData);
-      setTechnicians(techsData);
-
-      const unsubscribeTickets = onSnapshot(collection(db, "external-tickets"), (snapshot) => {
-        const ticketsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket));
-        setTickets(ticketsData);
-        setLoading(false);
-        setPullDistance(0);
-      });
-
-      return () => unsubscribeTickets();
-
-    } catch (error) {
-      console.error("Error fetching tickets page data:", error);
-      toast({ variant: 'destructive', title: "Erro ao buscar dados" });
-      setLoading(false);
-    }
-  }, [toast]);
-
-
   useEffect(() => {
-    const unsubscribePromise = fetchData();
-    return () => {
-        unsubscribePromise.then(unsub => {
-            if (unsub) unsub();
+    setLoading(true);
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+        const usersData = snapshot.docs.map(doc => {
+            const userData = { id: doc.id, ...doc.data() } as User;
+             if ((userData as any).sectorId && !userData.sectorIds) {
+                userData.sectorIds = [(userData as any).sectorId];
+            } else if (!userData.sectorIds) {
+                userData.sectorIds = [];
+            }
+            return userData;
         });
-    }
-  }, [fetchData]);
+        setUsers(usersData);
+    }, () => setUsers([]));
+    
+    const unsubSectors = onSnapshot(collection(db, "sectors"), (snapshot) => {
+        setSectors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector)));
+    }, () => setSectors([]));
+    
+    const unsubTechs = onSnapshot(collection(db, "technicians"), (snapshot) => {
+        setTechnicians(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician)));
+    }, () => setTechnicians([]));
+
+    const unsubTickets = onSnapshot(collection(db, "external-tickets"), (snapshot) => {
+        setTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
+        setPullDistance(0);
+    }, () => setTickets([]));
+
+    // Failsafe to turn off loading
+    const timer = setTimeout(() => setLoading(false), 3000);
+
+    return () => {
+        unsubUsers();
+        unsubSectors();
+        unsubTechs();
+        unsubTickets();
+        clearTimeout(timer);
+    };
+}, []);
+
   
   // Persist status filter to session storage
   useEffect(() => {
@@ -495,16 +485,16 @@ export default function ExternalTicketsPage() {
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
   
-  if (loading && tickets.length === 0) {
+  const hasActiveRoute = filteredTickets.some(t => t.technicianId === user?.id && t.enRoute);
+
+
+  if (loading) {
     return (
         <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin" />
         </div>
     );
   }
-  
-  const hasActiveRoute = filteredTickets.some(t => t.technicianId === user?.id && t.enRoute);
-
 
   return (
     <>
@@ -575,7 +565,7 @@ export default function ExternalTicketsPage() {
                     onStatusChange={handleStatusChange}
                 />
                 ))}
-                {filteredTickets.length === 0 && !loading && (
+                {filteredTickets.length === 0 && (
                 <div className="col-span-full text-center text-muted-foreground py-10">
                     Nenhum chamado encontrado com os filtros selecionados.
                 </div>
@@ -629,3 +619,5 @@ export default function ExternalTicketsPage() {
     </>
   );
 }
+
+    

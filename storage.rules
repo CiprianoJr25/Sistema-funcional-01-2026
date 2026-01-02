@@ -1,50 +1,26 @@
 
-/*
-This is a placeholder for your Cloud Storage for Firebase security rules.
-By default, it is set to allow read and write access to all authenticated users.
-
-This file is also used to configure CORS for your bucket. The Firebase Studio
-backend will detect the cors.json configuration below and apply it to your
-Cloud Storage for Firebase bucket.
-
-For more information, see: https://firebase.google.com/docs/storage/web/cors
-*/
-/*
-cors.json
-[
-  {
-    "origin": ["*"],
-    "method": ["GET", "POST", "PUT", "HEAD"],
-    "responseHeader": ["Content-Type"],
-    "maxAgeSeconds": 3600
-  }
-]
-*/
-
-
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Regra para avatares:
-    // Qualquer um pode ler para exibir no app.
-    // Apenas o próprio usuário pode escrever/atualizar seu avatar.
-    match /avatars/{userId} {
-      allow read: if request.auth != null;
+    // Regra Genérica de Leitura: Permite que qualquer usuário autenticado leia arquivos.
+    // Isso é útil para exibir imagens de perfil, fotos de chamados, etc., em toda a aplicação.
+    allow read: if request.auth != null;
+
+    // Regras de Escrita Específicas por Caminho
+
+    // Permite que um usuário escreva (crie, atualize, delete) arquivos apenas
+    // dentro de sua própria pasta de avatar.
+    match /avatars/{userId}/{allPaths=**} {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Regra para fotos de chamados:
-    // Apenas usuários autenticados podem ler ou escrever fotos de chamados.
-    match /tickets/{ticketId}/{fileName} {
-      allow read, write: if request.auth != null;
-    }
-    
-    // Regra para assinaturas:
-    // Apenas usuários autenticados podem ler ou escrever assinaturas.
-    match /signatures/{ticketId}/{fileName} {
-      allow read, write: if request.auth != null;
+    // Permite que qualquer usuário autenticado adicione/atualize arquivos
+    // em qualquer pasta de chamado. A lógica da aplicação deve garantir que
+    // apenas usuários autorizados (como o técnico do chamado) façam o upload.
+    match /tickets/{ticketId}/{allPaths=**} {
+      allow write: if request.auth != null;
     }
   }
 }

@@ -25,8 +25,9 @@ import type {
   ExternalTicket,
   PreventiveRoutePlan,
   SupportPoint,
+  ServiceContract,
 } from "@/lib/types";
-import { collection, onSnapshot, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import { collection, onSnapshot, query, where, getDocs, orderBy, limit, getDoc, doc } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { Bot, FileText, Loader2, Sparkles, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -38,13 +39,15 @@ import { planPreventiveRoutes } from "@/ai/flows/plan-preventive-routes";
 import { differenceInDays, parseISO, startOfDay, endOfDay, format } from "date-fns";
 import { SupportPointsManager } from "@/components/planning/support-points-manager";
 
-async function findLastPreventiveTicketForClient(clientId: string, sectorId: string): Promise<ExternalTicket | null> {
+async function findLastPreventiveTicket(clientId: string, sectorId: string): Promise<ExternalTicket | null> {
     const ticketsRef = collection(db, 'external-tickets');
-    // Querying without ordering to avoid composite index requirement.
-    // This is more robust but requires client-side sorting.
     const q = query(
         ticketsRef,
-        where('client.id', '==', clientId)
+        where('client.id', '==', clientId),
+        where('sectorId', '==', sectorId),
+        where('type', '==', 'contrato'),
+        orderBy('createdAt', 'desc'),
+        limit(1)
     );
     const querySnapshot = await getDocs(q);
 
@@ -52,23 +55,17 @@ async function findLastPreventiveTicketForClient(clientId: string, sectorId: str
         return null;
     }
 
-    // Filter and sort in-memory to find the most recent relevant ticket
-    const relevantTickets = querySnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket))
-        .filter(ticket => 
-            ticket.sectorId === sectorId &&
-            (ticket.type === 'contrato' || ticket.type === 'padrão') // Consider standard tickets as potential preventives
-        )
-        .sort((a, b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime()); // Sort descending by date
-
-    return relevantTickets.length > 0 ? relevantTickets[0] : null;
+    const lastTicketDoc = querySnapshot.docs[0];
+    return { id: lastTicketDoc.id, ...lastTicketDoc.data() } as ExternalTicket;
 }
+
 
 export default function PlanningPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [contracts, setContracts] = useState<ServiceContract[]>([]);
   const [supportPoints, setSupportPoints] = useState<SupportPoint[]>([]);
   const [selectedSectorId, setSelectedSectorId] = useState("all");
   const [selectedSupportPointId, setSelectedSupportPointId] = useState<string | undefined>(undefined);
@@ -81,12 +78,12 @@ export default function PlanningPage() {
     const unsubSectors = onSnapshot(collection(db, "sectors"), (snapshot) =>
       setSectors(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Sector)))
     );
-
-    const unsubClients = onSnapshot(query(collection(db, "clients")), (snapshot) => {
-        const clientsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Client));
-        setClients(clientsData);
+    const unsubClients = onSnapshot(collection(db, "clients"), (snapshot) => {
+        setClients(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Client)));
     });
-    
+    const unsubContracts = onSnapshot(collection(db, "serviceContracts"), (snapshot) => {
+        setContracts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ServiceContract)));
+    });
     const unsubSupportPoints = onSnapshot(collection(db, "support-points"), (snapshot) => {
         setSupportPoints(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as SupportPoint)));
     });
@@ -94,14 +91,11 @@ export default function PlanningPage() {
     return () => {
       unsubSectors();
       unsubClients();
+      unsubContracts();
       unsubSupportPoints();
     };
   }, []);
   
-  const clientsWithContracts = useMemo(() => {
-    return clients.filter(c => c.status === 'active' && c.preventiveContract);
-  }, [clients]);
-
   const visibleSectors = useMemo(() => {
     if (user?.role === "admin" || user?.role === "gerente") {
       return sectors.filter(s => s.status === 'active');
@@ -135,31 +129,35 @@ export default function PlanningPage() {
     setPlan(null);
 
     try {
-        let clientsInScope = clientsWithContracts;
-        let targetSectors = visibleSectors;
-
+        let contractsInScope = contracts.filter(c => c.status === 'active');
+        
         if (selectedSectorId !== 'all') {
-            targetSectors = visibleSectors.filter(s => s.id === selectedSectorId);
+             contractsInScope = contractsInScope.filter(c => c.sectorIds.includes(selectedSectorId));
+        } else if (user?.role === 'encarregado' && user.sectorIds) {
+             contractsInScope = contractsInScope.filter(c => c.sectorIds.some(csId => user.sectorIds?.includes(csId)));
         }
 
         const clientsForPlanning: { id: string; name: string; address: string }[] = [];
         
-        for (const client of clientsInScope) {
-            const contract = client.preventiveContract;
-            if (!contract || !client.address?.street) continue;
+        for (const contract of contractsInScope) {
+            const clientDoc = await getDoc(doc(db, "clients", contract.clientId));
+            if (!clientDoc.exists()) continue;
+            const client = { id: clientDoc.id, ...clientDoc.data() } as Client;
 
-            const clientSectorsInScope = contract.sectorIds.filter(csId => targetSectors.some(ts => ts.id === csId));
+            if (!client.address?.street) continue;
 
-            for (const sectorId of clientSectorsInScope) {
-                const lastTicket = await findLastPreventiveTicketForClient(client.id, sectorId);
-                const lastVisitDate = lastTicket ? parseISO(lastTicket.createdAt) : new Date(0); // Use a long-past date if no ticket exists
+            const clientSectorsForPlanning = contract.sectorIds.filter(csId => 
+                selectedSectorId === 'all' || csId === selectedSectorId
+            );
+
+            for (const sectorId of clientSectorsForPlanning) {
+                const lastTicket = await findLastPreventiveTicket(client.id, sectorId);
+                const lastVisitDate = lastTicket ? parseISO(lastTicket.updatedAt) : new Date(0);
                 
                 const nextDueDate = new Date(lastVisitDate);
                 nextDueDate.setDate(nextDueDate.getDate() + contract.frequencyDays);
                 
-                // Check if the next due date is within the selected planning range
                 if (nextDueDate >= startOfDay(dateRange.from) && nextDueDate <= endOfDay(dateRange.to)) {
-                    // Check to avoid adding duplicates if client is in multiple selected sectors
                     if (!clientsForPlanning.some(c => c.id === client.id)) {
                         clientsForPlanning.push({
                             id: client.id,

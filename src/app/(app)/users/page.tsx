@@ -15,7 +15,7 @@ import {
 import { NewUserForm, NewUserFormValues } from "@/components/users/new-user-form";
 import { UsersTable } from "@/components/users/users-table";
 import { User, Sector, ModulePermissions, UserStatus } from "@/lib/types";
-import { collection, getDocs, setDoc, doc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, setDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { useToast } from "@/hooks/use-toast";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
@@ -33,26 +33,24 @@ export default function UsersPage() {
   const { user: adminUser } = useAuth();
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [usersSnapshot, sectorsSnapshot] = await Promise.all([
-          getDocs(collection(db, "users")),
-          getDocs(collection(db, "sectors"))
-        ]);
-        const usersData = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-        const sectorsData = sectorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector));
-        setUsers(usersData);
-        setSectors(sectorsData);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast({ variant: 'destructive', title: "Erro ao buscar dados" });
-      } finally {
-        setLoading(false);
-      }
+    setLoading(true);
+    
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+        setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+    }, () => setUsers([]));
+
+    const unsubSectors = onSnapshot(collection(db, "sectors"), (snapshot) => {
+        setSectors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector)));
+    }, () => setSectors([]));
+
+    const timer = setTimeout(() => setLoading(false), 3000);
+
+    return () => {
+        unsubUsers();
+        unsubSectors();
+        clearTimeout(timer);
     };
-    fetchData();
-  }, [toast]);
+  }, []);
   
   const filteredUsers = useMemo(() => {
     const baseUsers = users.filter(u => u.role !== 'tecnico');
@@ -70,7 +68,6 @@ export default function UsersPage() {
 
     const auth = getAuth();
     try {
-        // Create user in secondary auth instance
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
         const newUserId = userCredential.user.uid;
 
@@ -83,11 +80,13 @@ export default function UsersPage() {
             status: 'active',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
+            sectorIds: [],
             avatarUrl: "",
             ...(values.sectorIds && values.sectorIds.length > 0 && { sectorIds: values.sectorIds }),
+            ...(values.euroInfoId && { euroInfoId: values.euroInfoId }),
+            ...(values.rondoInfoId && { rondoInfoId: values.rondoInfoId }),
         };
 
-        // Save user profile to Firestore
         await setDoc(doc(db, "users", newUserId), newUser);
 
         setUsers(prev => [newUser, ...prev]);
@@ -119,6 +118,8 @@ export default function UsersPage() {
         role: values.role,
         sectorIds: values.role === 'encarregado' ? values.sectorIds : [],
         updatedAt: new Date().toISOString(),
+        euroInfoId: values.euroInfoId,
+        rondoInfoId: values.rondoInfoId,
       };
 
       await updateDoc(userDocRef, updateData);
@@ -159,7 +160,6 @@ export default function UsersPage() {
             permissions,
             updatedAt: new Date().toISOString(),
         });
-        // Update local state to reflect changes immediately
         setUsers(prevUsers => prevUsers.map(u => 
             u.id === userId 
                 ? { ...u, permissions: { ...u.permissions, ...permissions } } 

@@ -1,15 +1,12 @@
-
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Este middleware não faz nada, mas o arquivo é necessário para que as reescritas (rewrites) funcionem corretamente.
+// Middleware desativado para resolver o problema de redirecionamento.
+// A lógica de proteção de rota agora está centralizada no layout da aplicação.
 export function middleware(request: NextRequest) {
-  return NextResponse.next()
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    // Adicione aqui os caminhos que você quer que o middleware intercepte
-    // Por enquanto, podemos deixar vazio.
-  ],
+  matcher: [], // Desativa completamente o middleware
 }

@@ -14,17 +14,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "../ui/checkbox";
-import { useEffect, useState } from "react";
-import { Separator } from "../ui/separator";
-import { Client, Sector } from "@/lib/types";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/firebase/config";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
-import React from "react";
+import { useState } from "react";
+import { Client } from "@/lib/types";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "O nome é obrigatório." }),
@@ -38,11 +30,9 @@ const formSchema = z.object({
     city: z.string().min(2, { message: "A cidade é obrigatória."}),
     state: z.string().min(2, { message: "O estado é obrigatório."}),
   }),
-  hasPreventiveContract: z.boolean().default(false),
-  preventiveContract: z.object({
-    sectorIds: z.array(z.string()).refine(value => value.length > 0, { message: "Selecione pelo menos um setor." }),
-    frequencyDays: z.coerce.number().positive({ message: "A frequência deve ser maior que zero." }),
-  }).optional(),
+  euroInfoId: z.string().optional(),
+  rondoInfoId: z.string().optional(),
+  slaHours: z.coerce.number().optional(),
 });
 
 
@@ -55,23 +45,7 @@ interface EditClientFormProps {
 }
 
 export function EditClientForm({ client, onSave, onFinished }: EditClientFormProps) {
-  const [sectors, setSectors] = useState<Sector[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-
-   useEffect(() => {
-    const fetchSectors = async () => {
-      try {
-        const sectorsSnapshot = await getDocs(collection(db, "sectors"));
-        const sectorsData = sectorsSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as Sector))
-          .filter(sector => sector.status === 'active');
-        setSectors(sectorsData);
-      } catch (error) {
-        console.error("Error fetching sectors: ", error);
-      }
-    };
-    fetchSectors();
-  }, []);
 
   const form = useForm<EditClientFormValues>({
     resolver: zodResolver(formSchema),
@@ -80,15 +54,11 @@ export function EditClientForm({ client, onSave, onFinished }: EditClientFormPro
         document: client.document,
         phone: client.phone,
         address: client.address,
-        hasPreventiveContract: !!client.preventiveContract,
-        preventiveContract: client.preventiveContract ? {
-            sectorIds: client.preventiveContract.sectorIds,
-            frequencyDays: client.preventiveContract.frequencyDays,
-        } : { sectorIds: [], frequencyDays: 30 }
+        euroInfoId: client.euroInfoId,
+        rondoInfoId: client.rondoInfoId,
+        slaHours: client.slaHours,
     },
   });
-  
-  const hasPreventive = form.watch("hasPreventiveContract");
 
   async function onSubmit(values: EditClientFormValues) {
     setIsSaving(true);
@@ -141,6 +111,48 @@ export function EditClientForm({ client, onSave, onFinished }: EditClientFormPro
                   </FormItem>
                 )}
               />
+              <div className="grid grid-cols-2 gap-4">
+                 <FormField
+                    control={form.control}
+                    name="euroInfoId"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>ID EuroInfo</FormLabel>
+                        <FormControl>
+                        <Input placeholder="ID do sistema legado" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="rondoInfoId"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>ID RondoInfo</FormLabel>
+                        <FormControl>
+                        <Input placeholder="ID do sistema legado" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+              </div>
+            
+            <FormField
+                control={form.control}
+                name="slaHours"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>SLA (em horas)</FormLabel>
+                    <FormControl>
+                    <Input type="number" placeholder="Deixe em branco para nenhum" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
 
             {/* Endereço */}
             <h3 className="text-lg font-medium border-b pb-2 pt-4">Endereço</h3>
@@ -226,112 +238,6 @@ export function EditClientForm({ client, onSave, onFinished }: EditClientFormPro
                     )}
                 />
             </div>
-
-            {/* Contrato de Manutenção Preventiva */}
-            <h3 className="text-lg font-medium border-b pb-2 pt-4">Contrato de Manutenção Preventiva</h3>
-            <FormField
-                control={form.control}
-                name="hasPreventiveContract"
-                render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                    <Checkbox
-                        checked={field.value}
-                        onCheckedChange={(checked) => {
-                            field.onChange(checked);
-                            if (!checked) {
-                                form.setValue("preventiveContract", undefined);
-                            } else {
-                                form.setValue("preventiveContract", { sectorIds: [], frequencyDays: 30 });
-                            }
-                        }}
-                    />
-                    </FormControl>
-                    <FormLabel className="font-normal">
-                        Este cliente possui contrato de manutenção preventiva?
-                    </FormLabel>
-                </FormItem>
-                )}
-            />
-            {hasPreventive && (
-                <div className="space-y-4 rounded-md border p-4">
-                    <FormField
-                        control={form.control}
-                        name="preventiveContract.frequencyDays"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Frequência da Visita Preventiva (em dias)</FormLabel>
-                            <FormControl>
-                            <Input type="number" placeholder="Ex: 30" {...field} value={field.value ?? ""} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="preventiveContract.sectorIds"
-                        render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                            <FormLabel>Setores do Contrato</FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <FormControl>
-                                    <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        className={cn(
-                                        "w-full justify-between",
-                                        !field.value?.length && "text-muted-foreground"
-                                        )}
-                                    >
-                                        {field.value && field.value.length > 0
-                                        ? `${field.value.length} setor(es) selecionado(s)`
-                                        : "Selecione os setores"}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                    </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                    <Command>
-                                    <CommandInput placeholder="Buscar setor..." />
-                                    <CommandEmpty>Nenhum setor encontrado.</CommandEmpty>
-                                    <CommandGroup>
-                                        <CommandList>
-                                        {sectors.map((sector) => (
-                                            <CommandItem
-                                            value={sector.name}
-                                            key={sector.id}
-                                            onSelect={() => {
-                                                const currentIds = field.value || [];
-                                                const newIds = currentIds.includes(sector.id)
-                                                ? currentIds.filter((id) => id !== sector.id)
-                                                : [...currentIds, sector.id];
-                                                field.onChange(newIds);
-                                            }}
-                                            >
-                                            <Check
-                                                className={cn(
-                                                "mr-2 h-4 w-4",
-                                                field.value?.includes(sector.id)
-                                                    ? "opacity-100"
-                                                    : "opacity-0"
-                                                )}
-                                            />
-                                            {sector.name}
-                                            </CommandItem>
-                                        ))}
-                                        </CommandList>
-                                    </CommandGroup>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                </div>
-            )}
         </div>
 
         <div className="flex justify-end gap-2 pt-4 border-t">

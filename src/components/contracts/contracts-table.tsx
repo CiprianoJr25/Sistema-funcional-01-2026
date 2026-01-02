@@ -4,17 +4,16 @@
 import * as React from "react"
 import {
   ColumnDef,
-  ColumnFiltersState,
   SortingState,
-  VisibilityState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
+  ColumnFiltersState,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MoreHorizontal } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, ChevronLeft, ChevronsLeft, ChevronsRight, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -35,76 +34,64 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import type { Client } from "@/lib/types"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog"
-import { ClientDetails } from "./client-details"
-import { Checkbox } from "../ui/checkbox"
-import { Label } from "../ui/label"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog"
+import type { ServiceContract, Sector } from "@/lib/types"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { EditContractForm, EditContractFormValues } from "./edit-contract-form"
+import { format } from "date-fns"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
-import { EditClientForm, EditClientFormValues } from "./edit-client-form"
 
 type ActionType = 'activate' | 'deactivate';
 
-const ActionsCell = ({ row, onStatusChange, onEdit, onViewDetails }: { row: any, onStatusChange: (client: Client, status: 'active' | 'inactive') => void, onEdit: (client: Client) => void, onViewDetails: (client: Client) => void }) => {
-  const client = row.original as Client
+const ActionsCell = ({ row, onStatusChange, onEdit }: { row: any, onStatusChange: (contract: ServiceContract, status: 'active' | 'inactive') => void, onEdit: (contract: ServiceContract) => void }) => {
+  const contract = row.original as ServiceContract
   const [isAlertOpen, setIsAlertOpen] = React.useState(false);
   const [actionType, setActionType] = React.useState<ActionType | null>(null);
 
-  const handleActionClick = (e: React.MouseEvent, type: ActionType) => {
+  const handleActionClick = (type: ActionType) => {
     setActionType(type);
     setIsAlertOpen(true);
   }
 
-  const handleConfirmAction = (e: React.MouseEvent) => {
+  const handleConfirmAction = () => {
     if (actionType) {
-      onStatusChange(client, actionType === 'activate' ? 'active' : 'inactive');
+      onStatusChange(contract, actionType === 'activate' ? 'active' : 'inactive');
     }
     setIsAlertOpen(false);
-  }
-  
-  const handleEditClick = (e: React.MouseEvent) => {
-    onEdit(client);
   }
 
   return (
     <>
-      <div onClick={(e) => e.stopPropagation()}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
-              <span className="sr-only">Abrir menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onViewDetails(client)}>Ver Detalhes</DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => { navigator.clipboard.writeText(client.id); }}
-            >
-              Copiar ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleEditClick}>Editar</DropdownMenuItem>
-            {client.status === 'active' ? (
-                <DropdownMenuItem onClick={(e) => handleActionClick(e, 'deactivate')} className="text-destructive focus:text-destructive">
-                    Desativar
-                </DropdownMenuItem>
-            ) : (
-                <DropdownMenuItem onClick={(e) => handleActionClick(e, 'activate')}>
-                    Reativar
-                </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
+            <span className="sr-only">Abrir menu</span>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>Ações</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => onEdit(contract)}>Editar Contrato</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {contract.status === 'active' ? (
+              <DropdownMenuItem onClick={() => handleActionClick('deactivate')} className="text-destructive focus:text-destructive">
+                  Desativar
+              </DropdownMenuItem>
+          ) : (
+              <DropdownMenuItem onClick={() => handleActionClick('activate')}>
+                  Reativar
+              </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
        <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
-              Você deseja {actionType === 'activate' ? 'reativar' : 'desativar'} o cliente {client.name}?
+              Você deseja {actionType === 'activate' ? 'reativar' : 'desativar'} o contrato para o cliente {contract.clientName}?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -117,66 +104,66 @@ const ActionsCell = ({ row, onStatusChange, onEdit, onViewDetails }: { row: any,
   )
 }
 
-interface ClientsTableProps {
-    data: Client[];
-    onStatusChange: (client: Client, status: 'active' | 'inactive') => void;
-    onUpdateClient: (clientId: string, values: EditClientFormValues) => Promise<boolean>;
+interface ContractsTableProps {
+    data: ServiceContract[];
+    sectors: Sector[];
+    onStatusChange: (contract: ServiceContract, status: 'active' | 'inactive') => void;
+    onUpdateContract: (contractId: string, values: EditContractFormValues) => Promise<boolean>;
 }
 
-export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTableProps) {
+export function ContractsTable({ data, sectors, onStatusChange, onUpdateContract }: ContractsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([
-    { id: 'name', desc: false } // Default sort by name ascending
+    { id: 'clientName', desc: false }
   ])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
-  const [rowSelection, setRowSelection] = React.useState({})
-  const [selectedClient, setSelectedClient] = React.useState<Client | null>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [isEditOpen, setIsEditOpen] = React.useState(false);
+  const [selectedContract, setSelectedContract] = React.useState<ServiceContract | null>(null);
   const [showInactive, setShowInactive] = React.useState(false);
 
-  const handleEdit = (client: Client) => {
-    setSelectedClient(client);
+  const handleEdit = (contract: ServiceContract) => {
+    setSelectedContract(contract);
     setIsEditOpen(true);
   };
-  
-  const handleViewDetails = (client: Client) => {
-    setSelectedClient(client);
-    setIsDetailsOpen(true);
-  }
 
-  const handleSaveEdit = async (clientId: string, values: EditClientFormValues) => {
-      const success = await onUpdateClient(clientId, values);
+  const handleSaveEdit = async (contractId: string, values: EditContractFormValues) => {
+      const success = await onUpdateContract(contractId, values);
       if (success) {
           setIsEditOpen(false);
       }
   };
 
   const tableColumns = React.useMemo(() => {
-    const columns: ColumnDef<Client>[] = [
+    const columns: ColumnDef<ServiceContract>[] = [
       {
-        accessorKey: "name",
+        accessorKey: "clientName",
         header: ({ column }) => (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Nome
+            Cliente
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
-        cell: ({ row }) => <div className="capitalize">{row.getValue("name")}</div>,
+        cell: ({ row }) => <div className="capitalize">{row.getValue("clientName")}</div>,
       },
       {
-        accessorKey: "document",
-        header: "Documento",
+        accessorKey: "frequencyDays",
+        header: "Frequência",
+        cell: ({ row }) => <div>{row.getValue("frequencyDays")} dias</div>,
       },
       {
-        accessorKey: "phone",
-        header: "Telefone",
+        accessorKey: "sectorIds",
+        header: "Setores",
+        cell: ({ row }) => {
+            const sectorIds = row.getValue("sectorIds") as string[];
+            const sectorNames = sectorIds.map(id => sectors.find(s => s.id === id)?.name).filter(Boolean);
+            return (
+                <div className="flex flex-wrap gap-1">
+                    {sectorNames.map(name => <Badge key={name} variant="secondary">{name}</Badge>)}
+                </div>
+            )
+        }
       },
       {
         accessorKey: "status",
@@ -185,18 +172,23 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
           <Badge variant={row.getValue("status") === 'active' ? "default" : "destructive"} className="capitalize">{row.getValue("status") === 'active' ? 'Ativo' : 'Inativo'}</Badge>
         ),
       },
+       {
+        accessorKey: "createdAt",
+        header: "Criado em",
+        cell: ({ row }) => <div>{format(new Date(row.getValue("createdAt")), "dd/MM/yyyy")}</div>,
+      },
       {
         id: "actions",
         enableHiding: false,
-        cell: ({ row }) => <ActionsCell row={row} onStatusChange={onStatusChange} onEdit={handleEdit} onViewDetails={handleViewDetails} />,
+        cell: ({ row }) => <ActionsCell row={row} onStatusChange={onStatusChange} onEdit={handleEdit} />,
       },
     ];
     return columns;
-  }, [onStatusChange]);
+  }, [onStatusChange, sectors]);
 
   const filteredData = React.useMemo(() => {
     if (showInactive) return data;
-    return data.filter(client => client.status === 'active');
+    return data.filter(contract => contract.status === 'active');
   }, [data, showInactive]);
 
   const table = useReactTable({
@@ -208,34 +200,20 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
     state: {
       sorting,
       columnFilters,
-      columnVisibility,
-      rowSelection,
     },
   })
-
-  const handleRowDoubleClick = (row: any) => {
-    handleEdit(row.original);
-  }
-
-  React.useEffect(() => {
-    if (!isDetailsOpen) {
-      setSelectedClient(null);
-    }
-  }, [isDetailsOpen]);
 
   return (
     <div className="w-full">
       <div className="flex items-center justify-between py-4">
         <Input
-          placeholder="Filtrar por nome..."
-          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+          placeholder="Filtrar por cliente..."
+          value={(table.getColumn("clientName")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
-            table.getColumn("name")?.setFilterValue(event.target.value)
+            table.getColumn("clientName")?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
@@ -274,15 +252,8 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  onDoubleClick={(e) => {
-                    const target = e.target as HTMLElement;
-                    // Previne que o duplo clique seja acionado se o clique foi em um botão ou dentro de um menu
-                    if (target.closest('button') || target.closest('[role="menu"]')) {
-                      return;
-                    }
-                    handleRowDoubleClick(row);
-                  }}
                   className="cursor-pointer"
+                  onDoubleClick={() => handleEdit(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -300,16 +271,16 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
                   colSpan={tableColumns.length}
                   className="h-24 text-center"
                 >
-                  Nenhum resultado encontrado.
+                  Nenhum contrato encontrado.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-       <div className="flex items-center justify-between space-x-2 py-4">
+      <div className="flex items-center justify-between space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredRowModel().rows.length} cliente(s) encontrado(s).
+          {table.getFilteredRowModel().rows.length} contrato(s) encontrado(s).
         </div>
         <div className="flex items-center space-x-6 lg:space-x-8">
             <div className="flex items-center space-x-2">
@@ -376,21 +347,17 @@ export function ClientsTable({ data, onStatusChange, onUpdateClient }: ClientsTa
             </div>
         </div>
       </div>
-      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-          <DialogContent className="sm:max-w-xl">
-            <DialogHeader>
-              <DialogTitle>Detalhes do Cliente</DialogTitle>
-            </DialogHeader>
-            {selectedClient && <ClientDetails client={selectedClient} />}
-          </DialogContent>
-        </Dialog>
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent className="sm:max-w-xl">
             <DialogHeader>
-              <DialogTitle>Editar Cliente</DialogTitle>
-              <DialogDescription>Altere as informações do cliente {selectedClient?.name}.</DialogDescription>
+              <DialogTitle>Editar Contrato de Serviço</DialogTitle>
+              <DialogDescription>Altere as informações do contrato para {selectedContract?.clientName}.</DialogDescription>
             </DialogHeader>
-            {selectedClient && <EditClientForm client={selectedClient} onSave={handleSaveEdit} onFinished={() => setIsEditOpen(false)} />}
+            {selectedContract && <EditContractForm 
+                contract={selectedContract} 
+                sectors={sectors}
+                onSave={handleSaveEdit} 
+                onFinished={() => setIsEditOpen(false)} />}
           </DialogContent>
         </Dialog>
     </div>

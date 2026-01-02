@@ -7,25 +7,29 @@ import { Logo } from "@/components/logo";
 import { NavLinks } from "@/components/nav-links";
 import { UserNav } from "@/components/user-nav";
 import { useAuth } from "@/hooks/use-auth";
-import { useRouter } from "next/navigation";
-import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarSeparator, SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
+import { useRouter, useSearchParams } from "next/navigation";
+import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarSeparator, SidebarTrigger, SidebarInset, SidebarProvider, useOptionalSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useOptionalSidebar } from '@/components/ui/sidebar';
+import type { User } from '@/lib/types';
 
 
-function AppLayoutContent({ children }: { children: React.ReactNode }) {
+export default function AppLayout({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
     const router = useRouter();
     const sidebar = useOptionalSidebar();
-    const isMobile = useIsMobile();
    
     useEffect(() => {
-      if (!loading && !user) {
+      // Se ainda estiver verificando a autenticação, não faça nada.
+      if (loading) {
+        return;
+      }
+      // Se a verificação terminou e não há usuário, redirecione para o login.
+      if (!user) {
         router.replace('/login');
       }
     }, [user, loading, router]);
     
+    // Mostra a tela de carregamento enquanto o useAuth verifica o estado do usuário.
     if (loading || !user) {
       return (
         <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -33,9 +37,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       );
     }
-  
+
     return (
-      <>
+      <SidebarProvider>
         <Sidebar collapsible="icon" className='border-r'>
           <SidebarHeader className="p-4 justify-center mt-2 bg-muted/50">
               <Link href="/dashboard">
@@ -82,14 +86,6 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             {children}
           </main>
         </SidebarInset>
-      </>
-    )
-  }
-  
-  export default function AppLayout({ children }: { children: React.ReactNode }) {
-    return (
-      <SidebarProvider>
-        <AppLayoutContent>{children}</AppLayoutContent>
       </SidebarProvider>
     )
   }

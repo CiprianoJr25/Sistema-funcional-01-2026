@@ -6,7 +6,7 @@ import React from 'react';
 // que não devem exibir a barra lateral e o cabeçalho principal da aplicação.
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       {children}
     </div>
   );

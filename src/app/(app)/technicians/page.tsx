@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Loader2 } from "lucide-react";
@@ -16,7 +16,7 @@ import { NewTechnicianForm, NewTechnicianFormValues } from "@/components/technic
 import { TechniciansTable } from "@/components/technicians/technicians-table";
 import { Technician, Sector, User, ModulePermissions, UserStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { collection, getDocs, doc, setDoc, updateDoc, writeBatch } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, updateDoc, writeBatch, onSnapshot, query } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { useAuth } from "@/hooks/use-auth";
@@ -33,76 +33,84 @@ export default function TechniciansPage() {
   const { toast } = useToast();
   const { user: adminUser } = useAuth(); 
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [rawTechnicians, setRawTechnicians] = useState<Technician[]>([]);
+
+  const filterVisibleTechnicians = useCallback((techs: Technician[], currentUser: User | null): Technician[] => {
+    if (!currentUser) return [];
+
+    if (currentUser.role === 'admin' || currentUser.role === 'gerente') {
+        return techs;
+    }
+    if (currentUser.role === 'encarregado') {
+        const userSectorIds = currentUser.sectorIds || [];
+        return userSectorIds.length > 0 
+            ? techs.filter(tech => tech.sectorIds && tech.sectorIds.some(techSectorId => userSectorIds.includes(techSectorId)))
+            : [];
+    }
+    return []; // Technicians cannot see this page.
+  }, []);
+
+  const combineTechniciansAndUsers = useCallback((techsData: Technician[], usersData: User[]): Technician[] => {
+    if (!adminUser) return [];
+    
+    return techsData.map(techData => {
+        const correspondingUser = usersData.find(u => u.id === techData.userId);
+        if (!correspondingUser) {
+            return null; // This technician's user doc might not exist yet or was deleted
+        }
+        return {
+            ...correspondingUser, // User data comes first
+            ...techData,        // Technician data overwrites, preserving specific technician fields
+            id: techData.id,    // Ensure technician ID (which is the same as userId) is correct
+        };
+    }).filter(Boolean) as Technician[]; // Filter out nulls
+  }, [adminUser]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!adminUser) return;
-      setLoading(true);
-      
-      try {
-        const [techSnapshot, sectorsSnapshot, usersSnapshot] = await Promise.all([
-          getDocs(collection(db, "technicians")),
-          getDocs(collection(db, "sectors")),
-          getDocs(collection(db, "users")),
-        ]);
-        
-        const sectorsData = sectorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector));
-        const allUsersData = usersSnapshot.docs.map(doc => {
-            const user = { id: doc.id, ...doc.data() } as User;
-             // Compatibility layer: ensure sectorIds exists
-            if ((user as any).sectorId && !user.sectorIds) {
-                user.sectorIds = [(user as any).sectorId];
-            } else if (!user.sectorIds) {
-                user.sectorIds = [];
+    setLoading(true);
+
+    const collectionsToFetch = [
+        { name: 'technicians', setter: setRawTechnicians },
+        { name: 'users', setter: setAllUsers },
+        { name: 'sectors', setter: setSectors },
+    ];
+
+    let loadedCount = 0;
+    const totalCollections = collectionsToFetch.length;
+
+    const unsubscribes = collectionsToFetch.map(({ name, setter }) => {
+        const q = query(collection(db, name));
+        return onSnapshot(q, 
+            (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any;
+                setter(data);
+            },
+            (error) => {
+                console.warn(`A coleção '${name}' não foi encontrada ou ocorreu um erro. Tratando como vazia.`, error);
+                setter([]); 
             }
-            return user;
-        });
+        );
+    });
 
-        setSectors(sectorsData);
-        setAllUsers(allUsersData);
-        
-        // Combine tech data with user data for a complete profile
-        const combinedTechnicians = techSnapshot.docs.map(doc => {
-            const techData = doc.data() as Omit<Technician, 'id'>;
-            const correspondingUser = allUsersData.find(u => u.id === doc.id);
-            return {
-                id: doc.id,
-                ...techData,
-                // Ensure fields from 'users' collection are the source of truth
-                sectorIds: correspondingUser?.sectorIds || [],
-                status: correspondingUser?.status || techData.status,
-                name: correspondingUser?.name || techData.name,
-                email: correspondingUser?.email || techData.email,
-                phone: correspondingUser?.phone || (techData as any).phone,
-            };
-        });
-
-        // Apply visibility filter based on user role
-        let visibleTechnicians = combinedTechnicians;
-        if (adminUser.role === 'encarregado') {
-          const userSectorIds = adminUser.sectorIds || [];
-          if (userSectorIds.length > 0) {
-            visibleTechnicians = combinedTechnicians.filter(tech => 
-              tech.sectorIds && tech.sectorIds.some(techSectorId => userSectorIds.includes(techSectorId))
-            );
-          } else {
-            visibleTechnicians = []; // Encarregado with no sectors sees no one
-          }
-        } else if (adminUser.role === 'tecnico') {
-          visibleTechnicians = []; // Technicians should not see this page's content
-        }
-        
-        setTechnicians(visibleTechnicians);
-
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast({ variant: 'destructive', title: "Erro ao buscar dados" });
-      } finally {
-        setLoading(false);
-      }
+    return () => {
+        unsubscribes.forEach(unsub => unsub());
     };
-    fetchData();
-  }, [adminUser, toast]);
+}, []);
+
+  useEffect(() => {
+      // This effect now ONLY combines data and sets the final loading state
+      if (rawTechnicians.length > 0 && allUsers.length > 0 && sectors.length > 0) {
+          const combined = combineTechniciansAndUsers(rawTechnicians, allUsers);
+          const visible = filterVisibleTechnicians(combined, adminUser);
+          setTechnicians(visible);
+          setLoading(false);
+      } else if (!loading && (rawTechnicians.length === 0 || allUsers.length === 0)) {
+          // If we're not loading but some data is missing, it means there are no technicians/users to show.
+          // This prevents getting stuck on the loading screen.
+          setTechnicians([]);
+          setLoading(false);
+      }
+  }, [rawTechnicians, allUsers, sectors, adminUser, combineTechniciansAndUsers, filterVisibleTechnicians, loading]);
   
   const filteredTechnicians = useMemo(() => {
     if (sectorFilter === 'all') {
@@ -133,7 +141,9 @@ export default function TechniciansPage() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         avatarUrl: "",
-        sectorIds: [values.sectorId],
+        sectorIds: values.sectorIds,
+        euroInfoId: values.euroInfoId,
+        rondoInfoId: values.rondoInfoId,
       };
       await setDoc(doc(db, "users", newUserId), newUser);
       
@@ -142,23 +152,13 @@ export default function TechniciansPage() {
         name: values.name,
         email: values.email,
         status: 'active',
-        sectorIds: [values.sectorId]
+        sectorIds: values.sectorIds,
+        euroInfoId: values.euroInfoId,
+        rondoInfoId: values.rondoInfoId,
       };
+      // The ID for the technician document is the same as the user ID
       await setDoc(doc(db, "technicians", newUserId), newTechnician);
       
-      let shouldAddToState = false;
-      if (adminUser.role === 'admin' || adminUser.role === 'gerente') {
-        shouldAddToState = true;
-      } else if (adminUser.role === 'encarregado') {
-        if (adminUser.sectorIds?.includes(values.sectorId)) {
-           shouldAddToState = true;
-        }
-      }
-      
-      if (shouldAddToState) {
-        setTechnicians(prev => [{ ...newUser, ...newTechnician, phone: values.phone } as Technician, ...prev]);
-      }
-
       setIsDialogOpen(false);
       toast({
         title: "Técnico Criado com Sucesso!",
@@ -187,15 +187,21 @@ export default function TechniciansPage() {
         name: values.name,
         phone: values.phone,
         sectorIds: values.sectorIds,
+        euroInfoId: values.euroInfoId,
+        rondoInfoId: values.rondoInfoId,
         updatedAt: new Date().toISOString(),
     };
     
     batch.update(userRef, updateData);
-    batch.update(techRef, { name: values.name, sectorIds: values.sectorIds });
+    batch.update(techRef, { 
+        name: values.name, 
+        sectorIds: values.sectorIds,
+        euroInfoId: values.euroInfoId,
+        rondoInfoId: values.rondoInfoId,
+    });
 
     try {
         await batch.commit();
-        setTechnicians(prev => prev.map(t => t.id === technicianId ? { ...t, ...values } : t));
         toast({ title: "Técnico atualizado com sucesso!" });
         return true;
     } catch (error) {
@@ -229,7 +235,6 @@ export default function TechniciansPage() {
 
     try {
         await batch.commit();
-        setTechnicians(prev => prev.map(t => t.id === technician.id ? { ...t, status: newStatus } : t));
         toast({
             title: "Status do Técnico Atualizado!",
             description: `O técnico ${technician.name} foi ${newStatus === 'active' ? 'reativado' : 'desativado'}.`,

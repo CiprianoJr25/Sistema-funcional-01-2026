@@ -26,25 +26,55 @@ export default function MonitoringPage() {
   useEffect(() => {
     setLoading(true);
 
-    const unsubscribes = [
-      onSnapshot(collection(db, "system-logs"), snapshot => {
-        const logsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SystemLog));
-        setLogs(logsData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
-      }),
-      onSnapshot(collection(db, "external-tickets"), snapshot => {
-        setExternalTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
-      }),
-      onSnapshot(collection(db, "internal-tickets"), snapshot => {
-        setInternalTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InternalTicket)));
-      }),
-      onSnapshot(collection(db, "users"), snapshot => {
-        setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
-      }),
+    const collectionsToFetch = [
+        { name: 'system-logs', setter: setLogs },
+        { name: 'external-tickets', setter: setExternalTickets },
+        { name: 'internal-tickets', setter: setInternalTickets },
+        { name: 'users', setter: setAllUsers },
     ];
 
-    setLoading(false);
-    return () => unsubscribes.forEach(unsub => unsub());
+    let loadedCount = 0;
+    const totalCollections = collectionsToFetch.length;
 
+    const unsubscribes = collectionsToFetch.map(({ name, setter }) => {
+        return onSnapshot(collection(db, name), 
+            (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (name === 'system-logs') {
+                    // Ordena os logs por data
+                    setter((data as SystemLog[]).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+                } else {
+                    setter(data as any);
+                }
+
+                loadedCount++;
+                if (loadedCount === totalCollections) {
+                    setLoading(false);
+                }
+            },
+            (error) => {
+                console.warn(`A coleção '${name}' não foi encontrada ou ocorreu um erro. Tratando como vazia.`, error);
+                setter([]); // Trata como um array vazio em caso de erro.
+                loadedCount++;
+                if (loadedCount === totalCollections) {
+                    setLoading(false);
+                }
+            }
+        );
+    });
+
+    // Um failsafe para garantir que o loading não fique preso
+    const timer = setTimeout(() => {
+        if (loading) {
+            setLoading(false);
+        }
+    }, 5000);
+
+    return () => {
+        unsubscribes.forEach(unsub => unsub());
+        clearTimeout(timer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredLogs = useMemo(() => {

@@ -60,40 +60,12 @@ export default function ClientsPage() {
         phone: values.phone,
         address: values.address,
         status: 'active',
-        ...(values.preventiveContract && { preventiveContract: values.preventiveContract }),
+        ...(values.slaHours && { slaHours: values.slaHours }),
+        ...(values.euroInfoId && { euroInfoId: values.euroInfoId }),
+        ...(values.rondoInfoId && { rondoInfoId: values.rondoInfoId }),
       };
       
       const docRef = await addDoc(collection(db, "clients"), newClientData);
-      
-      // Se tiver contrato preventivo, cria a O.S. inicial
-      if (values.hasPreventiveContract && values.preventiveContract) {
-          const fullAddress = `${values.address.street}, ${values.address.number || 'S/N'} - ${values.address.neighborhood}, ${values.address.city} - ${values.address.state}`;
-
-          for (const sectorId of values.preventiveContract.sectorIds) {
-             const newTicketData: Omit<ExternalTicket, 'id'> = {
-                client: {
-                    id: docRef.id,
-                    name: values.name,
-                    phone: values.phone,
-                    isWhats: false, 
-                    address: fullAddress,
-                },
-                requesterName: 'Sistema (Criação de Contrato)',
-                sectorId: sectorId,
-                creatorId: user.id,
-                description: `Manutenção preventiva inicial (Start de contrato). Frequência: ${values.preventiveContract.frequencyDays} dias.`,
-                type: 'contrato',
-                status: 'pendente',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-             };
-             await addDoc(collection(db, "external-tickets"), newTicketData);
-          }
-          toast({
-            title: "Contrato Ativado!",
-            description: "A O.S. de manutenção inicial foi criada automaticamente."
-          });
-      }
       
       toast({
         title: "Cliente adicionado com sucesso!",
@@ -114,17 +86,8 @@ export default function ClientsPage() {
   const handleUpdateClient = async (clientId: string, values: EditClientFormValues) => {
     const clientRef = doc(db, "clients", clientId);
     try {
-        const updatedData = {
-            ...values,
-            // Ensure preventiveContract is either set or removed based on the checkbox
-            preventiveContract: values.hasPreventiveContract ? values.preventiveContract : undefined
-        };
-        // Remove the helper boolean field before saving
-        delete (updatedData as any).hasPreventiveContract;
-
-
+        const updatedData = { ...values };
         await updateDoc(clientRef, updatedData);
-        // No need to update local state, onSnapshot will handle it.
         toast({ title: "Cliente atualizado com sucesso!" });
         return true;
     } catch (error) {
@@ -138,7 +101,6 @@ export default function ClientsPage() {
     const clientRef = doc(db, "clients", client.id);
     try {
         await updateDoc(clientRef, { status: newStatus });
-        // No need to update local state, onSnapshot will handle it.
         toast({
             title: "Status do Cliente Atualizado!",
             description: `O cliente ${client.name} foi ${newStatus === 'active' ? 'reativado' : 'desativado'}.`,

@@ -26,6 +26,8 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "O nome é obrigatório." }),
   phone: z.string().optional(),
   sectorIds: z.array(z.string()).min(1, { message: "Selecione pelo menos um setor." }),
+  euroInfoId: z.string().optional(),
+  rondoInfoId: z.string().optional(),
 });
 
 export type EditTechnicianFormValues = z.infer<typeof formSchema>;
@@ -46,6 +48,8 @@ export function EditTechnicianForm({ technician, onSave, onFinished, sectors }: 
       name: technician.name,
       phone: (technician as any).phone || "",
       sectorIds: technician.sectorIds || [],
+      euroInfoId: technician.euroInfoId || "",
+      rondoInfoId: technician.rondoInfoId || "",
     },
   });
 
@@ -88,6 +92,34 @@ export function EditTechnicianForm({ technician, onSave, onFinished, sectors }: 
               </FormItem>
             )}
           />
+           <div className="grid grid-cols-2 gap-4">
+             <FormField
+                control={form.control}
+                name="euroInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID EuroInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+             <FormField
+                control={form.control}
+                name="rondoInfoId"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>ID RondoInfo</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ID do sistema legado" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+          </div>
           <FormField
             control={form.control}
             name="sectorIds"

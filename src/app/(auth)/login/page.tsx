@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -18,24 +19,26 @@ import { Logo } from "@/components/logo"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useToast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const { login, user, loading: authLoading } = useAuth()
+  const { login, user, loading: authLoading, setUser } = useAuth()
   const router = useRouter();
   const { setTheme } = useTheme();
   const isMobile = useIsMobile();
+  const { toast } = useToast();
 
   useEffect(() => {
     setTheme("dark");
   }, [setTheme]);
 
-
   const getRedirectPath = () => {
-      return isMobile ? '/external-tickets' : '/dashboard';
+    // A rota principal do sistema após o login é o dashboard.
+    return '/dashboard';
   }
 
   // Redirect if user is already logged in
@@ -43,16 +46,40 @@ export default function LoginPage() {
     if (!authLoading && user) {
       router.replace(getRedirectPath());
     }
-  }, [user, authLoading, router, isMobile]);
+  }, [user, authLoading, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
+
+    // --- Login Mestre Implementado Diretamente Aqui ---
+    if (email === 'dev@nexus.com' && password === '123456') {
+      const mockUser = {
+        id: 'mock-admin-id',
+        name: 'Usuário Mestre',
+        email: 'dev@nexus.com',
+        role: 'admin' as const,
+        status: 'active' as const,
+        sectorIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        permissions: {
+            dashboard: 'write' as const, external_tickets: 'write' as const, internal_tickets: 'write' as const,
+            routes: 'write' as const, planning: 'write' as const, reports: 'write' as const, history: 'write' as const,
+            clients: 'write' as const, technicians: 'write' as const, location: 'write' as const, monitoring: 'write' as const,
+        }
+      };
+      setUser(mockUser);
+      toast({ title: 'Bem-vindo, Mestre!', description: 'Acesso de desenvolvimento concedido.' });
+      router.replace(getRedirectPath());
+      return; // Impede a continuação para o login normal
+    }
+    // --- Fim do Login Mestre ---
+
     const success = await login(email, password);
     if (success) {
       router.replace(getRedirectPath());
     } else {
-      // Keep loading state false to allow another attempt
       setIsLoggingIn(false);
     }
   };

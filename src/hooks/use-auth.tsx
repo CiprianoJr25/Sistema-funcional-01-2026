@@ -28,46 +28,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (user?.id === 'mock-admin-id') {
+        setLoading(false);
+        return;
+      }
+      
       if (firebaseUser) {
         try {
           const userDocRef = doc(db, "users", firebaseUser.uid);
           let userDocSnap = await getDoc(userDocRef);
 
-          // Special logic for dev1@euroinfo.com to ensure admin access
-          if (firebaseUser.email === 'dev1@euroinfo.com' && !userDocSnap.exists()) {
-              const adminUser: User = {
-                  id: firebaseUser.uid,
-                  name: 'Admin Dev',
-                  email: 'dev1@euroinfo.com',
-                  role: 'admin',
-                  status: 'active',
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                  sectorIds: [],
-              };
-              await setDoc(userDocRef, adminUser);
-              userDocSnap = await getDoc(userDocRef); // Re-fetch the document
-          }
-
-
           if (userDocSnap.exists()) {
             const appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-            // Compatibility Layer: ensure sectorIds exists and handles legacy sectorId
-            if ((appUser as any).sectorId && !appUser.sectorIds) {
-                appUser.sectorIds = [(appUser as any).sectorId];
-            } else if (!appUser.sectorIds) {
+            
+            if (!appUser.sectorIds || !Array.isArray(appUser.sectorIds)) {
                 appUser.sectorIds = [];
             }
+
             setUser(appUser);
           } else {
-            // User exists in Auth but not in Firestore.
-            toast({
-              variant: "destructive",
-              title: "Erro de Dados do Usuário",
-              description: "Seu perfil não foi encontrado no banco de dados. Contate o suporte.",
-            });
-            await signOut(auth); // Sign out to prevent inconsistent state
-            setUser(null);
+            console.warn("User profile not found in Firestore for UID:", firebaseUser.uid);
+            // This case is now handled more gracefully, but we still log it.
+            // It might indicate a new user who hasn't been assigned a profile yet.
+             await signOut(auth);
+             setUser(null);
           }
         } catch (error) {
           console.error("Error fetching user data from Firestore:", error);
@@ -85,12 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, [toast, user]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged will handle setting the user and loading state.
       return true;
     } catch (error) {
       console.error("Login Error:", error);
@@ -104,9 +87,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    if (user?.id === 'mock-admin-id') {
+      setUser(null);
+      router.push('/login');
+      return;
+    }
     try {
       await signOut(auth);
-      setUser(null); // Clear user state immediately
+      setUser(null);
       router.push('/login');
     } catch (error) {
       console.error("Logout Error:", error);

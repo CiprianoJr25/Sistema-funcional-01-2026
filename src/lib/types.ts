@@ -1,4 +1,5 @@
 
+
 export type Role = 'admin' | 'gerente' | 'encarregado' | 'tecnico' | 'vendedor';
 export type UserStatus = 'active' | 'inactive' | 'pending_invitation';
 
@@ -43,6 +44,8 @@ export interface User {
   updatedAt: string;
   permissions?: Partial<ModulePermissions>;
   mobileNavPreferences?: MobileNavPreferences;
+  euroInfoId?: string;
+  rondoInfoId?: string;
 }
 
 export interface Sector {
@@ -51,6 +54,8 @@ export interface Sector {
   code: string;
   description?: string;
   status: 'active' | 'archived';
+  euroInfoId?: string;
+  rondoInfoId?: string;
 }
 
 export interface RouteHistoryEntry {
@@ -68,6 +73,8 @@ export interface Technician {
   status: UserStatus;
   routeOrder?: string[];
   routeHistory?: RouteHistoryEntry[];
+  euroInfoId?: string;
+  rondoInfoId?: string;
 }
 
 export interface Address {
@@ -84,6 +91,17 @@ export interface PreventiveContract {
   frequencyDays: number;
 }
 
+export interface ServiceContract {
+  id: string;
+  clientId: string;
+  clientName: string;
+  sectorIds: string[];
+  frequencyDays: number;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Client {
     id: string;
     name: string;
@@ -92,7 +110,10 @@ export interface Client {
     address: Address;
     status: 'active' | 'inactive';
     slaHours?: number;
+    // O preventiveContract é mantido para a nova lógica de planejamento
     preventiveContract?: PreventiveContract;
+    euroInfoId?: string;
+    rondoInfoId?: string;
 }
 
 export interface SupportPoint {

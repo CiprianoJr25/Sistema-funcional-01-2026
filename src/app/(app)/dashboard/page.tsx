@@ -25,35 +25,59 @@ export default function Dashboard() {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("this-month");
+  const [loading, setLoading] = useState(true);
 
 
   useEffect(() => {
     setLoading(true);
 
-    const unsubscribes = [
-      onSnapshot(collection(db, 'external-tickets'), snapshot => {
-        setExternalTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExternalTicket)));
-      }),
-      onSnapshot(collection(db, 'internal-tickets'), snapshot => {
-        setInternalTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InternalTicket)));
-      }),
-      onSnapshot(collection(db, 'technicians'), snapshot => {
-        setTechnicians(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician)));
-      }),
-      onSnapshot(collection(db, 'sectors'), snapshot => {
-        setSectors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector)));
-      }),
-      onSnapshot(collection(db, 'users'), snapshot => {
-        setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
-      }),
+    const collectionsToFetch = [
+        { name: 'external-tickets', setter: setExternalTickets },
+        { name: 'internal-tickets', setter: setInternalTickets },
+        { name: 'technicians', setter: setTechnicians },
+        { name: 'sectors', setter: setSectors },
+        { name: 'users', setter: setUsers },
     ];
 
-    setLoading(false); // Assume data will stream in, so we can stop global loading.
+    let loadedCount = 0;
+    const totalCollections = collectionsToFetch.length;
 
-    return () => unsubscribes.forEach(unsub => unsub());
-  }, []);
+    const unsubscribes = collectionsToFetch.map(({ name, setter }) => {
+        const q = query(collection(db, name));
+        return onSnapshot(q, 
+            (snapshot) => {
+                setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
+                loadedCount++;
+                if (loadedCount === totalCollections) {
+                    setLoading(false);
+                }
+            },
+            (error) => {
+                console.warn(`A coleção '${name}' não foi encontrada ou ocorreu um erro. Tratando como vazia.`, error);
+                setter([]); // Garante que o estado seja um array vazio em caso de erro
+                loadedCount++;
+                if (loadedCount === totalCollections) {
+                    setLoading(false);
+                }
+            }
+        );
+    });
+
+    // Failsafe: se algo der muito errado, desativa o loading após 5 segundos.
+    const timer = setTimeout(() => {
+        if (loading) {
+            console.warn("Timeout de carregamento atingido. Forçando a renderização da UI.");
+            setLoading(false);
+        }
+    }, 5000);
+
+    return () => {
+        unsubscribes.forEach(unsub => unsub());
+        clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   const filteredData = useMemo(() => {
     const now = new Date();
@@ -75,8 +99,8 @@ export default function Dashboard() {
             break;
     }
 
-    const filteredExternal = externalTickets.filter(t => isWithinInterval(parseISO(t.createdAt), interval));
-    const filteredInternal = internalTickets.filter(t => isWithinInterval(parseISO(t.createdAt), interval));
+    const filteredExternal = externalTickets.filter(t => t.createdAt && isWithinInterval(parseISO(t.createdAt), interval));
+    const filteredInternal = internalTickets.filter(t => t.createdAt && isWithinInterval(parseISO(t.createdAt), interval));
 
     return {
         externalTickets: filteredExternal,
@@ -149,16 +173,26 @@ export default function Dashboard() {
             
             <PageHeader title="Visão por Setor" description="Métricas detalhadas para cada setor da empresa." />
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {sectors.map(sector => (
-                    <SectorStatsCard 
-                        key={sector.id}
-                        sector={sector}
-                        tickets={filteredData.externalTickets.filter(t => t.sectorId === sector.id)}
-                        technicians={technicians.filter(t => t.sectorIds && t.sectorIds.includes(sector.id))}
-                    />
-                ))}
-            </div>
+            {sectors.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {sectors.map(sector => (
+                        <SectorStatsCard 
+                            key={sector.id}
+                            sector={sector}
+                            tickets={filteredData.externalTickets.filter(t => t.sectorId === sector.id)}
+                            technicians={technicians.filter(t => t.sectorIds && t.sectorIds.includes(sector.id))}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="text-center text-muted-foreground">
+                            <p>Nenhum setor cadastrado para exibir estatísticas.</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                  <ActiveRoutesCard technicians={technicians} tickets={externalTickets} />
@@ -169,9 +203,15 @@ export default function Dashboard() {
       case "encarregado":
         if (!user.sectorIds || user.sectorIds.length === 0) {
             return (
-                <div className="flex items-center justify-center h-full">
-                    <p>Você não está associado a nenhum setor.</p>
-                </div>
+                <Card>
+                    <CardContent className="pt-6">
+                         <div className="text-center text-muted-foreground">
+                            <AlertCircle className="mx-auto h-8 w-8 mb-2" />
+                            <p className="font-semibold">Nenhum Setor Associado</p>
+                            <p className="text-sm">Você não está associado a nenhum setor. Peça para um administrador te vincular a um setor.</p>
+                        </div>
+                    </CardContent>
+                </Card>
             );
         }
         const mySectors = sectors.filter(s => user.sectorIds?.includes(s.id));
@@ -269,5 +309,3 @@ export default function Dashboard() {
     </>
   )
 }
-
-    
