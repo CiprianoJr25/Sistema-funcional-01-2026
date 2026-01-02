@@ -153,7 +153,7 @@ export default function TechniciansPage() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         avatarUrl: "",
-        sectorIds: [values.sectorId],
+        sectorIds: values.sectorIds,
         euroInfoId: values.euroInfoId,
         rondoInfoId: values.rondoInfoId,
       };
@@ -164,7 +164,7 @@ export default function TechniciansPage() {
         name: values.name,
         email: values.email,
         status: 'active',
-        sectorIds: [values.sectorId],
+        sectorIds: values.sectorIds,
         euroInfoId: values.euroInfoId,
         rondoInfoId: values.rondoInfoId,
       };
