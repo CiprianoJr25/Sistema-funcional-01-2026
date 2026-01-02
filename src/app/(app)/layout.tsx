@@ -8,9 +8,8 @@ import { NavLinks } from "@/components/nav-links";
 import { UserNav } from "@/components/user-nav";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarSeparator, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarSeparator, SidebarTrigger, SidebarInset, SidebarProvider, useOptionalSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
-import { useOptionalSidebar } from '@/components/ui/sidebar';
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -33,7 +32,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   
     return (
-      <>
+      <SidebarProvider>
         <Sidebar collapsible="icon" className='border-r'>
           <SidebarHeader className="p-4 justify-center mt-2 bg-muted/50">
               <Link href="/dashboard">
@@ -80,6 +79,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {children}
           </main>
         </SidebarInset>
-      </>
+      </SidebarProvider>
     )
   }
