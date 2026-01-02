@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Loader2 } from "lucide-react";
@@ -33,24 +33,50 @@ export default function TechniciansPage() {
   const { toast } = useToast();
   const { user: adminUser } = useAuth(); 
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [rawTechnicians, setRawTechnicians] = useState<Technician[]>([]);
+
+  const filterVisibleTechnicians = useCallback((techs: Technician[], currentUser: User | null): Technician[] => {
+    if (!currentUser) return [];
+
+    if (currentUser.role === 'admin' || currentUser.role === 'gerente') {
+        return techs;
+    }
+    if (currentUser.role === 'encarregado') {
+        const userSectorIds = currentUser.sectorIds || [];
+        return userSectorIds.length > 0 
+            ? techs.filter(tech => tech.sectorIds && tech.sectorIds.some(techSectorId => userSectorIds.includes(techSectorId)))
+            : [];
+    }
+    return []; // Technicians cannot see this page.
+  }, []);
+
+  const combineTechniciansAndUsers = useCallback((techsData: Technician[], usersData: User[]): Technician[] => {
+    if (!adminUser) return [];
+    
+    return techsData.map(techData => {
+        const correspondingUser = usersData.find(u => u.id === techData.userId);
+        if (!correspondingUser) {
+            return null; // This technician's user doc might not exist yet or was deleted
+        }
+        return {
+            ...correspondingUser, // User data comes first
+            ...techData,        // Technician data overwrites, preserving specific technician fields
+            id: techData.id,    // Ensure technician ID (which is the same as userId) is correct
+        };
+    }).filter(Boolean) as Technician[]; // Filter out nulls
+  }, [adminUser]);
 
   useEffect(() => {
-    if (!adminUser) {
-        setLoading(false);
-        return;
-    }
     setLoading(true);
 
     const unsubTechnicians = onSnapshot(collection(db, "technicians"), 
         (techSnapshot) => {
             const techsData = techSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
-             // When technicians change, re-combine with the current user list
-            const combined = combineTechniciansAndUsers(techsData, allUsers);
-            setTechnicians(filterVisibleTechnicians(combined, adminUser));
+            setRawTechnicians(techsData);
         }, 
         (error) => {
             console.error("Error fetching technicians:", error);
-            setTechnicians([]);
+            setRawTechnicians([]);
         }
     );
 
@@ -58,8 +84,6 @@ export default function TechniciansPage() {
         (userSnapshot) => {
             const usersData = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
             setAllUsers(usersData);
-            // This part is removed to avoid re-fetching and creating loops.
-            // The combination logic will now be handled more gracefully.
         }, 
         (error) => {
             console.error("Error fetching users:", error);
@@ -77,58 +101,28 @@ export default function TechniciansPage() {
         }
     );
 
-    const timer = setTimeout(() => setLoading(false), 3000); // Safety net to avoid infinite loading
-
     return () => {
         unsubTechnicians();
         unsubUsers();
         unsubSectors();
-        clearTimeout(timer);
     };
-}, [adminUser]);
+  }, []);
 
-// This effect will now handle combining data whenever `allUsers` or the raw `technicians` list changes.
-useEffect(() => {
-    // Re-fetch technicians snapshot to combine with new user data
-    getDocs(collection(db, "technicians")).then(techSnapshot => {
-        const techsData = techSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
-        const combined = combineTechniciansAndUsers(techsData, allUsers);
-        setTechnicians(filterVisibleTechnicians(combined, adminUser));
-        setLoading(false); // Ensure loading is off after combining
-    }).catch(() => setLoading(false));
-}, [allUsers, adminUser]);
-
-
-const combineTechniciansAndUsers = (techsData: Technician[], usersData: User[]): Technician[] => {
-    if (!adminUser) return [];
-    
-    return techsData.map(techData => {
-        const correspondingUser = usersData.find(u => u.id === techData.userId);
-        if (!correspondingUser) {
-            return null; // This technician's user doc might not exist yet or was deleted
-        }
-        return {
-            ...correspondingUser, // User data comes first
-            ...techData,        // Technician data overwrites, preserving specific technician fields
-            id: techData.id,    // Ensure technician ID (which is the same as userId) is correct
-        };
-    }).filter(Boolean) as Technician[]; // Filter out nulls
-};
-
-const filterVisibleTechnicians = (techs: Technician[], currentUser: User | null): Technician[] => {
-    if (!currentUser) return [];
-
-    if (currentUser.role === 'admin' || currentUser.role === 'gerente') {
-        return techs;
-    }
-    if (currentUser.role === 'encarregado') {
-        const userSectorIds = currentUser.sectorIds || [];
-        return userSectorIds.length > 0 
-            ? techs.filter(tech => tech.sectorIds && tech.sectorIds.some(techSectorId => userSectorIds.includes(techSectorId)))
-            : [];
-    }
-    return []; // Technicians cannot see this page.
-};
+  useEffect(() => {
+      if (rawTechnicians.length > 0 && allUsers.length > 0) {
+          const combined = combineTechniciansAndUsers(rawTechnicians, allUsers);
+          const visible = filterVisibleTechnicians(combined, adminUser);
+          setTechnicians(visible);
+          setLoading(false);
+      } else if (!loading) {
+          // If there are no technicians or users, we should stop loading
+          setTechnicians([]);
+      }
+      // Set loading to false if one is loaded and the other is empty.
+      if ((rawTechnicians.length > 0 && allUsers.length === 0) || (rawTechnicians.length === 0 && allUsers.length > 0)) {
+        setLoading(false);
+      }
+  }, [rawTechnicians, allUsers, adminUser, combineTechniciansAndUsers, filterVisibleTechnicians, loading]);
   
   const filteredTechnicians = useMemo(() => {
     if (sectorFilter === 'all') {
