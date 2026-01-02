@@ -34,7 +34,7 @@ const formSchema = z.object({
   email: z.string().email({ message: "Email inválido." }),
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   phone: z.string().optional(),
-  role: z.enum(["gerente", "encarregado", "vendedor"], { required_error: "Selecione um cargo." }),
+  role: z.enum(["admin", "gerente", "encarregado", "vendedor"], { required_error: "Selecione um cargo." }),
   sectorIds: z.array(z.string()).optional(),
   euroInfoId: z.string().optional(),
   rondoInfoId: z.string().optional(),
@@ -173,6 +173,7 @@ export function NewUserForm({ onSave, onFinished, sectors }: NewUserFormProps) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="gerente">Gerente</SelectItem>
                     <SelectItem value="encarregado">Encarregado</SelectItem>
                     <SelectItem value="vendedor">Vendedor</SelectItem>

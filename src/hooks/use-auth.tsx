@@ -33,44 +33,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userDocRef = doc(db, "users", firebaseUser.uid);
           let userDocSnap = await getDoc(userDocRef);
 
-          // Special logic for dev1@euroinfo.com to ensure admin access
-          if (firebaseUser.email === 'dev1@euroinfo.com' && !userDocSnap.exists()) {
-              const adminUser: User = {
+          // Lógica especial para auto-promoção de um novo usuário para ADMIN
+          // Isso serve como um backdoor seguro para criar um admin se a UI estiver inacessível.
+          if (!userDocSnap.exists() && firebaseUser.email?.endsWith('@euroinfo.com.br')) {
+              console.log(`Creating new admin profile for: ${firebaseUser.email}`);
+              const newAdminUser: User = {
                   id: firebaseUser.uid,
-                  name: 'Admin Dev',
-                  email: 'dev1@euroinfo.com',
-                  role: 'admin',
+                  name: firebaseUser.email.split('@')[0], // Usa a parte local do email como nome
+                  email: firebaseUser.email,
+                  role: 'admin', // Promove para admin
                   status: 'active',
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
-                  sectorIds: [],
+                  sectorIds: [], // Admins não precisam de setor
               };
-              await setDoc(userDocRef, adminUser);
-              userDocSnap = await getDoc(userDocRef); // Re-fetch the document
+              await setDoc(userDocRef, newAdminUser);
+              userDocSnap = await getDoc(userDocRef); // Re-busca o documento após a criação
+              toast({
+                  title: "Perfil de Administrador Criado!",
+                  description: "Um novo perfil de administrador foi configurado para este usuário."
+              });
           }
-
 
           if (userDocSnap.exists()) {
             const appUser = { id: userDocSnap.id, ...userDocSnap.data() } as User;
             
-            // Robust Compatibility Layer
+            // Camada de compatibilidade para garantir que sectorIds seja sempre um array
             if (!appUser.sectorIds || !Array.isArray(appUser.sectorIds)) {
-                if ((appUser as any).sectorId) {
-                    appUser.sectorIds = [(appUser as any).sectorId];
-                } else {
-                    appUser.sectorIds = [];
-                }
+                appUser.sectorIds = [];
             }
 
             setUser(appUser);
           } else {
-            // User exists in Auth but not in Firestore.
+            // Se o usuário está autenticado mas não tem perfil no DB (e não é o caso especial acima)
             toast({
               variant: "destructive",
               title: "Erro de Dados do Usuário",
               description: "Seu perfil não foi encontrado no banco de dados. Contate o suporte.",
             });
-            await signOut(auth); // Sign out to prevent inconsistent state
+            await signOut(auth);
             setUser(null);
           }
         } catch (error) {
@@ -94,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged will handle setting the user and loading state.
+      // onAuthStateChanged irá cuidar de definir o usuário e o estado de carregamento.
       return true;
     } catch (error) {
       console.error("Login Error:", error);
@@ -110,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await signOut(auth);
-      setUser(null); // Clear user state immediately
+      setUser(null);
       router.push('/login');
     } catch (error) {
       console.error("Logout Error:", error);
